@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base {
+  * {
+    @apply scroll-smooth;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 min-h-screen;
+    background-attachment: fixed;
+    color: #4a3728;
+  }
+
+  /* Custom scrollbar - warm soft colors */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-orange-100/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-orange-300 rounded-full hover:bg-orange-400;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply bg-white/50 backdrop-blur-md border border-white/40 shadow-xl;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-orange-300/30 hover:shadow-orange-400/40;
+  }
+
+  .card-glass {
+    @apply glass-effect rounded-2xl shadow-lg p-8 hover:border-white/60 transition-all duration-300;
+  }
+
+  .stat-card {
+    @apply rounded-2xl shadow-lg p-8 border border-white/30 transition-all duration-300 hover:shadow-xl bg-white/50 backdrop-blur-sm;
+  }
+
+  .nav-link {
+    @apply px-6 py-3 rounded-lg bg-white/30 hover:bg-white/50 text-amber-900 hover:text-amber-800 transition-all duration-200 border border-white/40 hover:border-white/60 font-medium;
+  }
+
+  .nav-link-active {
+    @apply px-6 py-3 rounded-lg bg-gradient-to-r from-orange-400 to-amber-500 text-white font-semibold transition-all duration-200 border border-orange-300 shadow-lg shadow-orange-300/30;
+  }
+}
+
+/* Animations */
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 3s ease infinite;
+  background-size: 200% 200%;
+}

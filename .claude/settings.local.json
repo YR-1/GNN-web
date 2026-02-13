@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(dir:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:www.nitrc.org)",
+      "WebFetch(domain:bioimagesuiteweb.github.io)",
+      "Bash(pip install:*)",
+      "Bash(npx next build)",
+      "Bash(npx tsc:*)",
+      "Bash(cmd.exe /c \"rmdir /s /q c:\\\\Users\\\\USER\\\\Documents\\\\InternQX\\\\Predict\\\\frontend\\\\.next 2>nul\")",
+      "Bash(npm install:*)",
+      "Bash(npm run type-check:*)"
+    ]
+  }
+}

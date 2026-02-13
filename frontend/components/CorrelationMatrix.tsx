@@ -2,35 +2,68 @@
 
 import { useEffect, useRef } from 'react'
 import Plotly from 'plotly.js-dist-min'
+import { CorrelationResults } from '@/lib/types'
 
 interface CorrelationMatrixProps {
-  data: {
-    n_rois: number
-    n_timepoints: number
-    correlation_matrix: number[][]
-    plotly_json: any
-    file_size: number
-    file_name: string
-  }
+  data: CorrelationResults
   fileName: string
 }
 
 export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixProps) {
   const plotRef = useRef<HTMLDivElement>(null)
+  const downloadButtonStyle = {
+    backgroundColor: '#949bad',
+    borderColor: '#949bad',
+    color: '#ffffff',
+  } as const
 
   useEffect(() => {
-    if (plotRef.current && data.plotly_json) {
-      try {
-        // Use the Plotly JSON from backend
-        Plotly.newPlot(plotRef.current, data.plotly_json.data, data.plotly_json.layout, {
-          responsive: true,
-          displayModeBar: true,
-          displaylogo: false,
-        })
-      } catch (error) {
-        console.error('Error rendering Plotly chart:', error)
-      }
+    if (!plotRef.current || !data.plotly_json) return
+
+    const baseLayout = (data.plotly_json.layout ?? {}) as Record<string, unknown>
+    const baseXaxis = ((baseLayout.xaxis as Record<string, unknown> | undefined) ?? {})
+    const baseYaxis = ((baseLayout.yaxis as Record<string, unknown> | undefined) ?? {})
+    const layout = {
+      ...baseLayout,
+      autosize: true,
+      dragmode: 'zoom',
+      uirevision: 'correlation-matrix',
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      margin: { l: 40, r: 20, t: 48, b: 40 },
+      xaxis: {
+        ...baseXaxis,
+        fixedrange: false,
+      },
+      yaxis: {
+        ...baseYaxis,
+        fixedrange: false,
+      },
     }
+
+    Plotly.newPlot(plotRef.current, data.plotly_json.data ?? [], layout, {
+      responsive: true,
+      displayModeBar: true,
+      displaylogo: false,
+      scrollZoom: true,
+      modeBarButtonsToAdd: [
+        'zoom2d',
+        'pan2d',
+        'select2d',
+        'lasso2d',
+        'zoomIn2d',
+        'zoomOut2d',
+        'autoScale2d',
+        'resetScale2d',
+      ],
+      modeBarButtonsToRemove: ['sendDataToCloud', 'toggleSpikelines', 'hoverCompareCartesian'],
+      toImageButtonOptions: {
+        filename: `correlation_matrix_${Date.now()}`,
+        format: 'png',
+      },
+    }).catch((error: unknown) => {
+      console.error('Error rendering Plotly chart:', error)
+    })
 
     return () => {
       if (plotRef.current) {
@@ -40,9 +73,9 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   }, [data])
 
   const downloadAsJSON = () => {
-    const dataStr = JSON.stringify(data, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
+    const dataString = JSON.stringify(data, null, 2)
+    const blob = new Blob([dataString], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = `correlation_matrix_${Date.now()}.json`
@@ -52,10 +85,10 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
 
   const downloadAsCSV = () => {
     const csvContent = data.correlation_matrix
-      .map(row => row.map(v => v.toFixed(4)).join('\t'))
+      .map((row) => row.map((value) => value.toFixed(4)).join('\t'))
       .join('\n')
-    const dataBlob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(dataBlob)
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = `correlation_matrix_${Date.now()}.csv`
@@ -63,57 +96,111 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
     URL.revokeObjectURL(url)
   }
 
+  const setDragMode = (mode: 'zoom' | 'pan' | 'select' | 'lasso') => {
+    if (!plotRef.current) return
+    Plotly.relayout(plotRef.current, { dragmode: mode }).catch((error: unknown) => {
+      console.error('Error switching drag mode:', error)
+    })
+  }
+
+  const resetView = () => {
+    if (!plotRef.current) return
+    Plotly.relayout(plotRef.current, {
+      'xaxis.autorange': true,
+      'yaxis.autorange': true,
+      dragmode: 'zoom',
+    }).catch((error: unknown) => {
+      console.error('Error resetting plot view:', error)
+    })
+  }
+
+  const zoomBy = (factor: number) => {
+    if (!plotRef.current) return
+    const plotEl = plotRef.current as unknown as {
+      layout?: { xaxis?: { range?: [number, number] }; yaxis?: { range?: [number, number] } }
+    }
+    const xRange = plotEl.layout?.xaxis?.range
+    const yRange = plotEl.layout?.yaxis?.range
+    if (!xRange || !yRange) {
+      resetView()
+      return
+    }
+
+    const xCenter = (xRange[0] + xRange[1]) / 2
+    const yCenter = (yRange[0] + yRange[1]) / 2
+    const xHalfSpan = ((xRange[1] - xRange[0]) * factor) / 2
+    const yHalfSpan = ((yRange[1] - yRange[0]) * factor) / 2
+
+    Plotly.relayout(plotRef.current, {
+      'xaxis.range': [xCenter - xHalfSpan, xCenter + xHalfSpan],
+      'yaxis.range': [yCenter - yHalfSpan, yCenter + yHalfSpan],
+    }).catch((error: unknown) => {
+      console.error('Error applying zoom:', error)
+    })
+  }
+
+  const downloadAsPNG = () => {
+    if (!plotRef.current) return
+    Plotly.downloadImage(plotRef.current, {
+      format: 'png',
+      filename: `correlation_matrix_${Date.now()}`,
+    }).catch((error: unknown) => {
+      console.error('Error exporting PNG:', error)
+    })
+  }
+
   return (
-    <div className='bg-white rounded-lg shadow p-8'>
-      <div className='mb-6'>
-        <h2 className='text-2xl font-bold text-gray-900 mb-2'>Correlation Matrix Analysis</h2>
-        <p className='text-gray-600 text-sm'>
-          File: <span className='font-mono'>{fileName}</span>
+    <div className='surface-card space-y-4'>
+      <header>
+        <h2 className='font-display text-lg text-ink-950'>Correlation Matrix</h2>
+        <p className='text-xs text-ink-700 mt-0.5'>
+          {data.n_rois} ROIs &middot; {data.n_timepoints} timepoints &middot; <span className='mono-data'>{fileName}</span>
         </p>
+      </header>
+
+      <div className='rounded-xl border border-brand-400/20 bg-white/82 overflow-hidden'>
+        <div ref={plotRef} style={{ width: '100%', height: '460px' }} />
+      </div>
+      <p className='text-xs text-ink-700'>
+        Plot controls are available below even if the floating Plotly toolbar is hidden.
+      </p>
+      <div className='flex flex-wrap gap-2'>
+        <button type='button' onClick={() => zoomBy(0.8)} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Zoom In</button>
+        <button type='button' onClick={() => zoomBy(1.25)} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Zoom Out</button>
+        <button type='button' onClick={() => setDragMode('pan')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Pan</button>
+        <button type='button' onClick={() => setDragMode('select')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Box Select</button>
+        <button type='button' onClick={() => setDragMode('lasso')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Lasso</button>
+        <button type='button' onClick={resetView} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Home / Reset</button>
+        <button type='button' onClick={downloadAsPNG} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>PNG</button>
       </div>
 
-      {/* Statistics */}
-      <div className='grid grid-cols-2 gap-4 mb-6'>
-        <div className='p-4 bg-blue-50 rounded border border-blue-200'>
-          <p className='text-gray-600 text-sm'>Number of ROIs</p>
-          <p className='text-2xl font-bold text-blue-600'>{data.n_rois}</p>
-        </div>
-        <div className='p-4 bg-green-50 rounded border border-green-200'>
-          <p className='text-gray-600 text-sm'>Timepoints</p>
-          <p className='text-2xl font-bold text-green-600'>{data.n_timepoints}</p>
-        </div>
-      </div>
-
-      {/* Plot Container */}
-      <div className='mb-6 border rounded-lg overflow-hidden bg-gray-50'>
-        <div ref={plotRef} style={{ width: '100%', height: '600px' }} />
-      </div>
-
-      {/* Download Options */}
-      <div className='flex gap-4'>
+      <div className='flex gap-2'>
         <button
+          type='button'
           onClick={downloadAsJSON}
-          className='flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium'
+          className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
+          style={downloadButtonStyle}
         >
-          Download as JSON
+          <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
+            <path d='M12 4v9' strokeLinecap='round' />
+            <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
+            <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
+          </svg>
+          <span>JSON</span>
         </button>
         <button
+          type='button'
           onClick={downloadAsCSV}
-          className='flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-medium'
+          className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
+          style={downloadButtonStyle}
         >
-          Download as CSV
+          <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
+            <path d='M12 4v9' strokeLinecap='round' />
+            <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
+            <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
+          </svg>
+          <span>CSV</span>
         </button>
-      </div>
-
-      {/* Statistics Info */}
-      <div className='mt-6 p-4 bg-gray-100 rounded text-sm text-gray-700'>
-        <p className='font-semibold mb-2'>Matrix Statistics:</p>
-        <ul className='space-y-1'>
-          <li>• Matrix size: {data.n_rois} × {data.n_rois}</li>
-          <li>• File size: {(data.file_size / 1024).toFixed(2)} KB</li>
-          <li>• Correlation range: [-1, 1]</li>
-          <li>• Color: Blue = negative, Red = positive correlation</li>
-        </ul>
       </div>
     </div>
   )

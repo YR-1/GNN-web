@@ -1,175 +1,158 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuthStore } from '@/lib/store'
-import { api } from '@/lib/api'
-
-interface DashboardStats {
-  total_uploads: number
-  completed_analyses: number
-  pending_analyses: number
-  avg_processing_time: number
-}
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { analysisService } from '@/lib/services'
+import { DashboardStats } from '@/lib/types'
+import { getStatusPillClass } from '@/lib/utils'
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [checked, setChecked] = useState(false)
-  const { user, logout, loading: authLoading } = useAuthStore()
-  const router = useRouter()
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useQuery<DashboardStats>({
+    queryKey: ['dashboardStats'],
+    queryFn: () => analysisService.getDashboardStats(),
+  })
 
-  useEffect(() => {
-    // Wait for auth loading to complete
-    if (authLoading) return
-    setChecked(true)
-
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    const fetchStats = async () => {
-      try {
-        const response = await api.getDashboardStats()
-        setStats(response.data)
-      } catch (error: any) {
-        // If 403, user not authenticated - redirect to login
-        if (error.response?.status === 403) {
-          router.push('/login')
-          return
-        }
-        console.error('Failed to fetch stats:', error)
-        setStats(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [user, router, authLoading])
-
-  const handleLogout = async () => {
-    await logout()
-    router.push('/login')
-  }
-
-  // Show loading while checking auth
-  if (authLoading || !checked) {
-    return (
-      <div className='min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-16 w-16 border-4 border-orange-400 border-t-amber-600 mx-auto mb-4'></div>
-          <p className='text-amber-900 text-lg font-medium'>Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) return null
+  const successRate = useMemo(() => {
+    if (!stats || stats.total_uploads <= 0) return 0
+    return Math.round((stats.completed_analyses / stats.total_uploads) * 100)
+  }, [stats])
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50'>
-      {/* Navigation */}
-      <nav className='bg-white/50 backdrop-blur-md border-b border-white/40 sticky top-0 z-50'>
-        <div className='max-w-7xl mx-auto px-6 py-4 flex justify-between items-center'>
-          <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-gradient-to-br from-orange-400 to-amber-600 rounded-lg flex items-center justify-center shadow-md'>
-              <span className='text-white font-bold'>📊</span>
-            </div>
-            <h1 className='text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent'>
-              ROI Analyzer
-            </h1>
-          </div>
-          <div className='flex gap-4 items-center'>
-            <span className='text-amber-900 text-sm font-medium'>{user.email}</span>
-            <button
-              onClick={handleLogout}
-              className='bg-rose-300/60 hover:bg-rose-400/70 text-rose-800 px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-rose-300/30 font-medium'
+    <div className='page-container'>
+      <header className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3'>
+        <div>
+          <h1 className='section-title'>Dashboard</h1>
+          <p className='section-subtitle'>Overview of upload volume and analysis progress.</p>
+        </div>
+        <div className='flex gap-2'>
+          <Link href='/upload' className='btn-glass-primary'>
+            <svg
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='1.9'
+              className='h-4 w-4'
+              aria-hidden='true'
             >
-              Logout
-            </button>
-          </div>
+              <path d='M12 16V5m0 0 4 4m-4-4-4 4' strokeLinecap='round' strokeLinejoin='round' />
+              <path d='M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3' strokeLinecap='round' />
+            </svg>
+            <span>New upload</span>
+          </Link>
+          <Link href='/history' className='btn-glass'>
+            <svg
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='1.9'
+              className='h-4 w-4'
+              aria-hidden='true'
+            >
+              <path d='M3.5 12a8.5 8.5 0 1 0 2.5-6' strokeLinecap='round' />
+              <path d='M3.5 4v4h4' strokeLinecap='round' strokeLinejoin='round' />
+              <path d='M12 7.5V12l3 2' strokeLinecap='round' strokeLinejoin='round' />
+            </svg>
+            <span>View history</span>
+          </Link>
         </div>
-      </nav>
+      </header>
 
-      {/* Main Content */}
-      <div className='max-w-7xl mx-auto px-6 py-12'>
-        {/* Navigation Tabs */}
-        <div className='flex gap-3 mb-12 overflow-x-auto pb-2'>
-          <Link href='/dashboard' className='nav-link-active'>Dashboard</Link>
-          <Link href='/upload' className='nav-link'>Upload Data</Link>
-          <Link href='/statistics' className='nav-link'>Statistics</Link>
-          <Link href='/history' className='nav-link'>History</Link>
+      {error && (
+        <div className='status-banner status-banner-error'>
+          <p>Unable to load dashboard metrics. Please try again.</p>
         </div>
+      )}
 
-        {/* Page Header */}
-        <div className='mb-12'>
-          <h2 className='text-4xl font-bold text-amber-900 mb-2'>Dashboard</h2>
-          <p className='text-amber-700'>Overview of your analysis activity</p>
+      {isLoading ? (
+        <div className='text-center py-12'>
+          <div className='loading-spinner mx-auto mb-3' />
+          <p className='text-ink-800'>Loading dashboard data...</p>
         </div>
+      ) : stats ? (
+        <>
+          <div>
+            <p className='font-semibold text-ink-950 mb-4'>Key Metrics</p>
+            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4'>
+              <article className='metric-card'>
+                <p className='metric-label'>Total uploads</p>
+                <p className='metric-value'>{stats.total_uploads}</p>
+                <p className='mt-2 text-xs text-ink-700'>Files submitted</p>
+              </article>
 
-        {/* Stats Grid */}
-        {loading ? (
-          <div className='flex justify-center items-center py-16'>
-            <div className='text-center'>
-              <div className='animate-spin rounded-full h-12 w-12 border-4 border-orange-400 border-t-amber-600 mx-auto mb-4'></div>
-              <p className='text-amber-900 font-medium'>Loading statistics...</p>
-            </div>
-          </div>
-        ) : stats ? (
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
-            {/* Total Uploads */}
-            <div className='group bg-gradient-to-br from-blue-100/40 to-blue-50/30 rounded-2xl shadow-lg p-8 border border-blue-200/50 hover:border-blue-300/70 transition-all duration-300 hover:shadow-xl hover:shadow-blue-300/20'>
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-amber-900 text-sm font-semibold'>Total Uploads</h3>
-                <span className='text-3xl'>📤</span>
-              </div>
-              <p className='text-4xl font-bold text-amber-900'>
-                {stats.total_uploads}
-              </p>
-              <p className='text-blue-600 text-xs mt-3 font-medium'>Files analyzed</p>
-            </div>
+              <article className='metric-card'>
+                <p className='metric-label'>Completed analyses</p>
+                <p className='metric-value'>{stats.completed_analyses}</p>
+                <p className='mt-2 text-xs text-ink-700'>Success rate: {successRate}%</p>
+              </article>
 
-            {/* Completed Analyses */}
-            <div className='group bg-gradient-to-br from-emerald-100/40 to-emerald-50/30 rounded-2xl shadow-lg p-8 border border-emerald-200/50 hover:border-emerald-300/70 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-300/20'>
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-amber-900 text-sm font-semibold'>Completed</h3>
-                <span className='text-3xl'>✨</span>
-              </div>
-              <p className='text-4xl font-bold text-emerald-700'>
-                {stats.completed_analyses}
-              </p>
-              <p className='text-emerald-700/70 text-xs mt-3 font-medium'>Success rate: {((stats.completed_analyses / stats.total_uploads) * 100).toFixed(0)}%</p>
-            </div>
+              <article className='metric-card'>
+                <p className='metric-label'>Failed analyses</p>
+                <p className='metric-value'>{stats.failed_analyses}</p>
+                <p className='mt-2 text-xs text-ink-700'>Total analyses: {stats.total_analyses}</p>
+              </article>
 
-            {/* Pending Analyses */}
-            <div className='group bg-gradient-to-br from-amber-100/40 to-amber-50/30 rounded-2xl shadow-lg p-8 border border-amber-200/50 hover:border-amber-300/70 transition-all duration-300 hover:shadow-xl hover:shadow-amber-300/20'>
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-amber-900 text-sm font-semibold'>Processing</h3>
-                <span className='text-3xl'>⏳</span>
-              </div>
-              <p className='text-4xl font-bold text-amber-600'>
-                {stats.pending_analyses}
-              </p>
-              <p className='text-amber-600/70 text-xs mt-3 font-medium'>In queue</p>
-            </div>
-
-            {/* Avg Processing Time */}
-            <div className='group bg-gradient-to-br from-orange-100/40 to-orange-50/30 rounded-2xl shadow-lg p-8 border border-orange-200/50 hover:border-orange-300/70 transition-all duration-300 hover:shadow-xl hover:shadow-orange-300/20'>
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-amber-900 text-sm font-semibold'>Avg Time</h3>
-                <span className='text-3xl'>⚡</span>
-              </div>
-              <p className='text-4xl font-bold text-orange-600'>
-                {stats.avg_processing_time}s
-              </p>
-              <p className='text-orange-600/70 text-xs mt-3 font-medium'>Per analysis</p>
+              <article className='metric-card'>
+                <p className='metric-label'>Total analyses</p>
+                <p className='metric-value'>{stats.total_analyses}</p>
+                <p className='mt-2 text-xs text-ink-700'>All time</p>
+              </article>
             </div>
           </div>
-        ) : null}
-      </div>
+
+          {stats.recent_uploads && stats.recent_uploads.length > 0 && (
+            <div>
+              <p className='font-semibold text-ink-950 mb-3'>Recent activity</p>
+              <div className='space-y-2'>
+                {stats.recent_uploads.map((upload) => (
+                  <div
+                    key={upload.upload_id}
+                    className='flex items-center justify-between gap-3 rounded-xl border border-brand-400/15 bg-white/60 px-4 py-2.5'
+                  >
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-sm font-medium text-ink-950 truncate'>{upload.file_name}</p>
+                      <p className='text-xs text-ink-700'>
+                        {new Date(upload.uploaded_at).toLocaleDateString()} at{' '}
+                        {new Date(upload.uploaded_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold shrink-0 ${getStatusPillClass(
+                        upload.status
+                      )}`}
+                    >
+                      {upload.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className='text-center py-12'>
+          <p className='text-ink-900 font-semibold'>No data yet</p>
+          <p className='text-sm text-ink-700 mt-2'>Upload your first file to get started.</p>
+          <Link href='/upload' className='btn-glass-primary mt-5 inline-flex'>
+            <svg
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='1.9'
+              className='h-4 w-4'
+              aria-hidden='true'
+            >
+              <path d='M12 16V5m0 0 4 4m-4-4-4 4' strokeLinecap='round' strokeLinejoin='round' />
+              <path d='M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3' strokeLinecap='round' />
+            </svg>
+            <span>Upload data</span>
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

@@ -16,7 +16,7 @@ This project is a web app that lets users upload ROI time-series data (.txt) and
 ### 1) Prerequisites
 - Python 3.11+
 - Node.js 18+
-- Supabase project (URL, anon key, DB password)
+- Supabase project (URL, anon key, service role key)
 
 ### 2) Supabase Schema
 Run the SQL below in the Supabase SQL Editor.
@@ -32,6 +32,7 @@ python -m uvicorn main:app --port 8000 --reload
 
 Backend docs: http://localhost:8000/docs
 
+if in cmd, venv\Scripts\activate
 ### 4) Frontend
 ```powershell
 cd frontend
@@ -48,16 +49,18 @@ Frontend app: http://localhost:3000
 ### backend/.env
 ```
 SUPABASE_URL=https://<project_ref>.supabase.co
-SUPABASE_KEY=<anon_key>
-DATABASE_URL=postgresql://postgres:<db_password>@db.<project_ref>.supabase.co:5432/postgres
+SUPABASE_KEY=<anon_or_publishable_key>
+SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 JWT_SECRET=<your_secret>
 DEBUG=True
+MODEL_REGISTRY_DIR=./models
+MODEL_REGISTRY_SCORES=listsort_ageadj,sleep_quality,emotion_recognition,sustained_attention,pmat
 ```
 
 ### frontend/.env.local
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project_ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=<publishable_key>
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
@@ -67,8 +70,19 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 1) User uploads a .txt file on the Upload page
 2) Backend saves it and creates DB records
-3) Backend runs notebook-driven analysis (Papermill)
+3) Backend runs a single-pass analysis pipeline (correlation + graph windows + model inference)
 4) Results are stored in DB and shown in the UI
+
+### Model Drop-In Path
+
+- Put `.pt` files in `backend/models/` (or your `MODEL_REGISTRY_DIR` path).
+- File naming convention is score-based:
+  - `listsort_ageadj.pt`
+  - `sleep_quality.pt`
+  - `emotion_recognition.pt`
+  - `sustained_attention.pt`
+  - `pmat.pt`
+- Startup logs show found/missing model files, and you can query the registry via `GET /api/models`.
 
 ---
 
@@ -77,11 +91,8 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 - "Error loading ASGI app. Could not import module 'app.main'"
   - Run: python -m uvicorn main:app --port 8000 --reload
 
-- "ModuleNotFoundError: No module named 'asyncpg'"
-  - Run: pip install asyncpg
-
 - 500 error on upload
-  - Check DATABASE_URL has password and correct host
+  - Check `SUPABASE_SERVICE_ROLE_KEY` is set in `backend/.env`
   - Ensure the schema below is applied
 
 ---
@@ -224,6 +235,10 @@ plotly>=5.18,<6.0
 papermill>=2.5,<3.0
 jupyter>=1.0,<2.0
 nbformat>=5.9,<6.0
+nilearn>=0.10,<0.12
+dill>=0.3.8,<0.4.0
+torch>=2.2,<3.0
+torch-geometric>=2.5,<3.0
 ```
 
 ---

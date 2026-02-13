@@ -1,274 +1,217 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { useAuthStore } from '@/lib/store'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
+import { CorrelationResults } from '@/lib/types'
+import { BoldTimeSeries } from '@/components/charts/BoldTimeSeries'
+import { AnalysisSelector } from '@/components/analysis/AnalysisSelector'
 
-const Plot = dynamic(() => import('react-plotly.js'), {
+const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix'), {
   ssr: false,
-  loading: () => <div className='text-center py-8'>Loading chart...</div>,
+  loading: () => (
+    <div className='surface-card text-center py-12'>
+      <div className='loading-spinner mx-auto mb-3' />
+      <p className='text-ink-800'>Loading chart...</p>
+    </div>
+  ),
 })
 
-interface AnalysisResults {
+interface AnalysisResponse {
+  status: string
+  execution_id: string
+  results?: CorrelationResults
+}
+
+interface MatrixSummary {
   mean: number
   median: number
-  std_dev: number
   min: number
   max: number
-  quartiles: {
-    q25: number
-    q50: number
-    q75: number
+  positiveRatio: number
+}
+
+const summarizeMatrix = (matrix: number[][]): MatrixSummary | null => {
+  const values: number[] = []
+  for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+    const row = matrix[rowIndex]
+    for (let columnIndex = rowIndex + 1; columnIndex < row.length; columnIndex += 1) {
+      const value = row[columnIndex]
+      if (Number.isFinite(value)) {
+        values.push(value)
+      }
+    }
   }
-  distribution: {
-    row_count: number
-    column_count: number
-    missing_values: number
+
+  if (!values.length) return null
+
+  const sorted = [...values].sort((left, right) => left - right)
+  const midpoint = Math.floor(sorted.length / 2)
+  const median =
+    sorted.length % 2 === 0
+      ? (sorted[midpoint - 1] + sorted[midpoint]) / 2
+      : sorted[midpoint]
+
+  const sum = values.reduce((total, current) => total + current, 0)
+  const positiveCount = values.filter((value) => value > 0).length
+
+  return {
+    mean: sum / values.length,
+    median,
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    positiveRatio: (positiveCount / values.length) * 100,
   }
 }
 
 function StatisticsContent() {
-  const [results, setResults] = useState<AnalysisResults | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const { user, logout } = useAuthStore()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const executionId = searchParams.get('executionId')
+  const router = useRouter()
+
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
     if (!executionId) {
-      setError('No execution ID provided')
       setLoading(false)
       return
     }
 
-    const fetchResults = async () => {
+    const fetchAnalysis = async () => {
       try {
         const response = await api.getAnalysis(executionId)
-        if (response.data.results) {
-          setResults(response.data.results)
-        }
+        setAnalysis(response.data)
       } catch (err: any) {
-        setError('Failed to fetch analysis results')
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          router.push('/login')
+          return
+        }
+        setError('Failed to load analysis results.')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchResults()
-  }, [user, router, executionId])
+    void fetchAnalysis()
+  }, [executionId, router])
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/login')
+  const summary = useMemo(() => {
+    if (!analysis?.results?.correlation_matrix) return null
+    return summarizeMatrix(analysis.results.correlation_matrix)
+  }, [analysis])
+
+  if (!executionId) {
+    return (
+      <AnalysisSelector
+        title='Statistics'
+        subtitle='Select a completed analysis to view its statistics.'
+        routePath='/statistics'
+      />
+    )
   }
 
-  if (!user) return null
-
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900'>
-      {/* Navigation */}
-      <nav className='bg-white/10 backdrop-blur-md border-b border-white/20 sticky top-0 z-50'>
-        <div className='max-w-7xl mx-auto px-6 py-4 flex justify-between items-center'>
-          <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-600 rounded-lg flex items-center justify-center'>
-              <span className='text-white font-bold'>📊</span>
-            </div>
-            <h1 className='text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent'>
-              ROI Analyzer
-            </h1>
-          </div>
-          <div className='flex gap-4 items-center'>
-            <span className='text-gray-300 text-sm'>{user.email}</span>
-            <button
-              onClick={handleLogout}
-              className='bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-500/30'
-            >
-              Logout
-            </button>
-          </div>
+    <div className='page-container'>
+      <header>
+        <h1 className='section-title'>Statistics</h1>
+        <p className='section-subtitle'>
+          Execution ID: <span className='mono-data'>{executionId}</span>
+        </p>
+      </header>
+
+      {error && (
+        <div className='status-banner status-banner-error'>
+          <p>{error}</p>
         </div>
-      </nav>
+      )}
 
-      {/* Main Content */}
-      <div className='max-w-7xl mx-auto px-6 py-12'>
-        {/* Navigation Tabs */}
-        <div className='flex gap-3 mb-12 overflow-x-auto pb-2'>
-          <Link
-            href='/dashboard'
-            className='px-6 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all duration-200 border border-white/10 hover:border-white/20 whitespace-nowrap'
-          >
-            Dashboard
-          </Link>
-          <Link
-            href='/upload'
-            className='px-6 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all duration-200 border border-white/10 hover:border-white/20 whitespace-nowrap'
-          >
-            Upload Data
-          </Link>
-          <Link
-            href='/statistics'
-            className='px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold transition-all duration-200 border border-transparent hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap'
-          >
-            Statistics
-          </Link>
-          <Link
-            href='/history'
-            className='px-6 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all duration-200 border border-white/10 hover:border-white/20 whitespace-nowrap'
-          >
-            History
-          </Link>
+      {loading ? (
+        <div className='text-center py-12'>
+          <div className='loading-spinner mx-auto mb-3' />
+          <p className='text-ink-800'>Loading statistics...</p>
         </div>
-
-        {/* Page Header */}
-        <div className='mb-12'>
-          <h2 className='text-4xl font-bold text-white mb-2'>Statistics</h2>
-          <p className='text-gray-400'>Detailed analysis of your data</p>
+      ) : !analysis ? null : analysis.status !== 'completed' ? (
+        <div className='status-banner status-banner-warning'>
+          <p>This execution is currently {analysis.status}. Return when processing is complete.</p>
         </div>
+      ) : !analysis.results ? (
+        <div className='status-banner status-banner-warning'>
+          <p>Execution completed but no statistics were returned.</p>
+        </div>
+      ) : (
+        <>
+          {summary && (
+            <div>
+              <p className='font-semibold text-ink-950 mb-4'>Summary Statistics</p>
+              <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4'>
+                <article className='metric-card'>
+                  <p className='metric-label'>Mean correlation</p>
+                  <p className='metric-value'>{summary.mean.toFixed(3)}</p>
+                </article>
+                <article className='metric-card'>
+                  <p className='metric-label'>Median correlation</p>
+                  <p className='metric-value'>{summary.median.toFixed(3)}</p>
+                </article>
+                <article className='metric-card'>
+                  <p className='metric-label'>Minimum</p>
+                  <p className='metric-value'>{summary.min.toFixed(3)}</p>
+                </article>
+                <article className='metric-card'>
+                  <p className='metric-label'>Maximum</p>
+                  <p className='metric-value'>{summary.max.toFixed(3)}</p>
+                </article>
+                <article className='metric-card'>
+                  <p className='metric-label'>Positive ratio</p>
+                  <p className='metric-value'>{summary.positiveRatio.toFixed(1)}%</p>
+                </article>
+              </div>
+            </div>
+          )}
 
-        {error && (
-          <div className='bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg mb-4 flex items-center gap-3'>
-            <span className='text-xl'>⚠️</span>
-            <p>{error}</p>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-white/40'>
+            <div>
+              <p className='font-semibold text-ink-950'>Predicted Scores</p>
+              <p className='text-sm text-ink-700'>
+                View cognitive and emotional score predictions derived from this connectivity data.
+              </p>
+            </div>
+            <Link href={`/predictions?executionId=${executionId}`} className='btn-primary shrink-0'>
+              View predictions
+            </Link>
           </div>
-        )}
 
-        {loading ? (
-          <div className='flex justify-center items-center py-16'>
-            <div className='text-center'>
-              <div className='animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-blue-400 mx-auto mb-4'></div>
-              <p className='text-gray-400'>Loading analysis results...</p>
-            </div>
+          <div>
+            <p className='font-semibold text-ink-950 mb-3'>BOLD Time Series</p>
+            <p className='text-sm text-ink-700 mb-3'>
+              Simulated fMRI BOLD signal fluctuations for 5 representative ROIs over {Math.max(analysis.results.n_timepoints, 100)} timepoints (TR = 2 s).
+            </p>
+            <BoldTimeSeries nTimepoints={analysis.results.n_timepoints} />
           </div>
-        ) : results ? (
-          <div className='space-y-8'>
-            {/* Summary Stats */}
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-              <div className='bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl shadow-lg p-8 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300'>
-                <div className='flex items-center justify-between mb-4'>
-                  <h3 className='text-gray-400 text-sm font-semibold'>Mean</h3>
-                  <span className='text-3xl'>📊</span>
-                </div>
-                <p className='text-4xl font-bold text-blue-400'>
-                  {results.mean.toFixed(2)}
-                </p>
-              </div>
-              <div className='bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl shadow-lg p-8 border border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300'>
-                <div className='flex items-center justify-between mb-4'>
-                  <h3 className='text-gray-400 text-sm font-semibold'>Median</h3>
-                  <span className='text-3xl'>📈</span>
-                </div>
-                <p className='text-4xl font-bold text-emerald-400'>
-                  {results.median.toFixed(2)}
-                </p>
-              </div>
-              <div className='bg-gradient-to-br from-purple-500/10 to-purple-600/5 rounded-2xl shadow-lg p-8 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300'>
-                <div className='flex items-center justify-between mb-4'>
-                  <h3 className='text-gray-400 text-sm font-semibold'>Std Dev</h3>
-                  <span className='text-3xl'>📉</span>
-                </div>
-                <p className='text-4xl font-bold text-purple-400'>
-                  {results.std_dev.toFixed(2)}
-                </p>
-              </div>
-            </div>
 
-            {/* Distribution Chart */}
-            <div className='bg-white/10 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-white/20'>
-              <h2 className='text-2xl font-bold text-white mb-6'>Distribution Chart</h2>
-              <Plot
-                data={[
-                  {
-                    x: ['Min', 'Q25', 'Median', 'Q75', 'Max'],
-                    y: [
-                      results.min,
-                      results.quartiles.q25,
-                      results.quartiles.q50,
-                      results.quartiles.q75,
-                      results.max,
-                    ],
-                    type: 'bar',
-                    marker: { color: '#3B82F6' },
-                  },
-                ]}
-                layout={{
-                  title: 'Data Distribution',
-                  xaxis: { title: 'Statistics' },
-                  yaxis: { title: 'Value' },
-                  height: 400,
-                }}
-              />
-            </div>
-
-            {/* Quartile Chart */}
-            <div className='bg-white rounded-lg shadow p-6'>
-              <h2 className='text-xl font-bold text-gray-900 mb-4'>Quartile Analysis</h2>
-              <Plot
-                data={[
-                  {
-                    x: ['Q25', 'Q50', 'Q75'],
-                    y: [
-                      results.quartiles.q25,
-                      results.quartiles.q50,
-                      results.quartiles.q75,
-                    ],
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    marker: { size: 8 },
-                  },
-                ]}
-                layout={{
-                  title: 'Quartile Progression',
-                  xaxis: { title: 'Quartile' },
-                  yaxis: { title: 'Value' },
-                  height: 400,
-                }}
-              />
-            </div>
-
-            {/* Data Info */}
-            <div className='bg-white rounded-lg shadow p-6'>
-              <h2 className='text-xl font-bold text-gray-900 mb-4'>Data Information</h2>
-              <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                <div>
-                  <p className='text-gray-500 text-sm'>Row Count</p>
-                  <p className='text-2xl font-bold text-gray-900'>
-                    {results.distribution.row_count}
-                  </p>
-                </div>
-                <div>
-                  <p className='text-gray-500 text-sm'>Column Count</p>
-                  <p className='text-2xl font-bold text-gray-900'>
-                    {results.distribution.column_count}
-                  </p>
-                </div>
-                <div>
-                  <p className='text-gray-500 text-sm'>Missing Values</p>
-                  <p className='text-2xl font-bold text-gray-900'>
-                    {results.distribution.missing_values}
-                  </p>
-                </div>
-              </div>
-            </div>
+          <div>
+            <p className='font-semibold text-ink-950 mb-3'>Correlation Matrix</p>
+            <CorrelationMatrix data={analysis.results} fileName={analysis.results.file_name} />
           </div>
-        ) : null}
-      </div>
+        </>
+      )}
     </div>
   )
 }
 
 export default function StatisticsPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className='surface-card text-center py-12'>
+          <div className='loading-spinner mx-auto mb-3' />
+          <p className='text-ink-800'>Loading statistics page...</p>
+        </div>
+      }
+    >
       <StatisticsContent />
     </Suspense>
   )

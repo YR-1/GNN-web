@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuthStore } from '@/lib/store'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
+import { CorrelationResults } from '@/lib/types'
 
 interface HistoryItem {
   upload_id: string
@@ -14,16 +14,10 @@ interface HistoryItem {
   execution_id?: string
 }
 
-interface AnalysisResult {
+interface AnalysisResponse {
   execution_id: string
-  file_name: string
-  num_rois?: number
-  num_timepoints?: number
-  pearson_mean?: number
-  pearson_median?: number
-  ledoit_wolf_mean?: number
-  ledoit_wolf_median?: number
-  timestamp?: string
+  status: string
+  results?: CorrelationResults & { error?: string }
 }
 
 interface UploadContentPreview {
@@ -34,378 +28,352 @@ interface UploadContentPreview {
   lines_returned: number
 }
 
+const statusPillClass = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'status-pill-completed'
+    case 'processing':
+      return 'status-pill-processing'
+    case 'queued':
+      return 'status-pill-queued'
+    case 'failed':
+      return 'status-pill-failed'
+    default:
+      return 'bg-slate-100 text-slate-700 border border-slate-300/70'
+  }
+}
+
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [analysisData, setAnalysisData] = useState<{ [key: string]: AnalysisResult }>({})
-  const [loadingAnalysis, setLoadingAnalysis] = useState<{ [key: string]: boolean }>({})
-  const [contentData, setContentData] = useState<{ [key: string]: UploadContentPreview }>({})
-  const [loadingContent, setLoadingContent] = useState<{ [key: string]: boolean }>({})
-  const [contentError, setContentError] = useState<{ [key: string]: string }>({})
-  const [showContent, setShowContent] = useState<{ [key: string]: boolean }>({})
+  const [analysisByExecution, setAnalysisByExecution] = useState<Record<string, AnalysisResponse>>({})
+  const [analysisLoading, setAnalysisLoading] = useState<Record<string, boolean>>({})
+  const [contentByUpload, setContentByUpload] = useState<Record<string, UploadContentPreview>>({})
+  const [contentLoading, setContentLoading] = useState<Record<string, boolean>>({})
+  const [contentError, setContentError] = useState<Record<string, string>>({})
+  const [showContent, setShowContent] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { user, logout } = useAuthStore()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortNewest, setSortNewest] = useState(true)
   const router = useRouter()
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+  const STATUS_FILTERS = ['all', 'completed', 'processing', 'queued', 'failed'] as const
 
+  const filteredHistory = useMemo(() => {
+    let items = history
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      items = items.filter((item) => item.file_name.toLowerCase().includes(q))
+    }
+    if (statusFilter !== 'all') {
+      items = items.filter((item) => item.status === statusFilter)
+    }
+    const sorted = [...items].sort((a, b) => {
+      const da = new Date(a.uploaded_at).getTime()
+      const db = new Date(b.uploaded_at).getTime()
+      return sortNewest ? db - da : da - db
+    })
+    return sorted
+  }, [history, searchQuery, statusFilter, sortNewest])
+
+  useEffect(() => {
     const fetchHistory = async () => {
       try {
         const response = await api.getHistory()
         setHistory(response.data)
       } catch (err: any) {
-        setError('Failed to fetch history')
+        if (err?.response?.status === 403 || err?.response?.status === 401) {
+          router.push('/login')
+          return
+        }
+        setError('Failed to load upload history.')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchHistory()
-  }, [user, router])
+    void fetchHistory()
+  }, [router])
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/login')
-  }
+  const fetchAnalysis = async (executionId: string) => {
+    if (analysisByExecution[executionId]) return
 
-  const fetchAnalysisData = async (executionId: string) => {
-    if (analysisData[executionId]) return
-
-    setLoadingAnalysis((prev) => ({ ...prev, [executionId]: true }))
+    setAnalysisLoading((previous) => ({ ...previous, [executionId]: true }))
     try {
       const response = await api.getAnalysis(executionId)
-      setAnalysisData((prev) => ({
-        ...prev,
-        [executionId]: response.data,
+      setAnalysisByExecution((previous) => ({
+        ...previous,
+        [executionId]: response.data as AnalysisResponse,
       }))
-    } catch (err) {
-      console.error('Failed to fetch analysis data:', err)
+    } catch (err: any) {
+      if (err?.response?.status === 403 || err?.response?.status === 401) {
+        router.push('/login')
+      }
     } finally {
-      setLoadingAnalysis((prev) => ({ ...prev, [executionId]: false }))
+      setAnalysisLoading((previous) => ({ ...previous, [executionId]: false }))
     }
   }
 
-  const fetchFileContent = async (uploadId: string) => {
-    if (contentData[uploadId]) return
+  const fetchUploadContent = async (uploadId: string) => {
+    if (contentByUpload[uploadId]) return
 
-    setLoadingContent((prev) => ({ ...prev, [uploadId]: true }))
-    setContentError((prev) => ({ ...prev, [uploadId]: '' }))
+    setContentLoading((previous) => ({ ...previous, [uploadId]: true }))
+    setContentError((previous) => ({ ...previous, [uploadId]: '' }))
     try {
       const response = await api.getUploadContent(uploadId, { max_lines: 200, max_chars: 20000 })
-      setContentData((prev) => ({
-        ...prev,
+      setContentByUpload((previous) => ({
+        ...previous,
         [uploadId]: response.data,
       }))
-    } catch (err) {
-      setContentError((prev) => ({ ...prev, [uploadId]: 'Failed to load file content' }))
+    } catch (err: any) {
+      if (err?.response?.status === 403 || err?.response?.status === 401) {
+        router.push('/login')
+        return
+      }
+      setContentError((previous) => ({ ...previous, [uploadId]: 'Failed to load file preview.' }))
     } finally {
-      setLoadingContent((prev) => ({ ...prev, [uploadId]: false }))
+      setContentLoading((previous) => ({ ...previous, [uploadId]: false }))
+    }
+  }
+
+  const toggleExpanded = (uploadId: string, executionId?: string) => {
+    const nextExpanded = expandedId === uploadId ? null : uploadId
+    setExpandedId(nextExpanded)
+
+    if (nextExpanded && executionId) {
+      void fetchAnalysis(executionId)
     }
   }
 
   const toggleContent = (uploadId: string) => {
-    setShowContent((prev) => {
-      const next = !prev[uploadId]
-      if (next && !contentData[uploadId]) {
-        fetchFileContent(uploadId)
+    setShowContent((previous) => {
+      const nextVisible = !previous[uploadId]
+      if (nextVisible && !contentByUpload[uploadId]) {
+        void fetchUploadContent(uploadId)
       }
-      return { ...prev, [uploadId]: next }
+      return { ...previous, [uploadId]: nextVisible }
     })
   }
 
-  const toggleExpanded = (uploadId: string, executionId?: string) => {
-    setExpandedId(expandedId === uploadId ? null : uploadId)
-    if (expandedId !== uploadId && executionId && !analysisData[executionId]) {
-      fetchAnalysisData(executionId)
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '✅'
-      case 'processing':
-        return '⏳'
-      case 'queued':
-        return '📋'
-      case 'failed':
-        return '❌'
-      default:
-        return '❓'
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
-      case 'processing':
-        return 'bg-blue-500/20 border-blue-500/50 text-blue-200'
-      case 'queued':
-        return 'bg-amber-500/20 border-amber-500/50 text-amber-200'
-      case 'failed':
-        return 'bg-red-500/20 border-red-500/50 text-red-200'
-      default:
-        return 'bg-gray-500/20 border-gray-500/50 text-gray-200'
-    }
-  }
-
-
-
-  if (!user) return null
-
   return (
-    <div className='min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50'>
-      {/* Navigation */}
-      <nav className='bg-white/50 backdrop-blur-md border-b border-white/40 sticky top-0 z-50'>
-        <div className='max-w-7xl mx-auto px-6 py-4 flex justify-between items-center'>
-          <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-gradient-to-br from-orange-400 to-amber-600 rounded-lg flex items-center justify-center shadow-md'>
-              <span className='text-white font-bold'>📊</span>
-            </div>
-            <h1 className='text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent'>
-              ROI Analyzer
-            </h1>
+    <div className='page-container'>
+      <header>
+        <h1 className='section-title'>Upload History</h1>
+        <p className='section-subtitle'>Review each upload, execution status, and analysis output.</p>
+      </header>
+
+      {!loading && history.length > 0 && (
+        <div className='grid grid-cols-1 sm:grid-cols-[minmax(220px,1fr)_180px_170px] gap-3 items-end'>
+          <div className='space-y-1'>
+            <label htmlFor='history-search' className='text-xs text-ink-700'>Search</label>
+            <input
+              id='history-search'
+              type='text'
+              placeholder='Search by file name...'
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className='input-field'
+            />
           </div>
-          <div className='flex gap-4 items-center'>
-            <span className='text-amber-900 text-sm font-medium'>{user.email}</span>
-            <button
-              onClick={handleLogout}
-              className='bg-rose-300/60 hover:bg-rose-400/70 text-rose-800 px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-rose-300/30 font-medium'
+
+          <div className='space-y-1'>
+            <label htmlFor='history-status-filter' className='text-xs text-ink-700'>Status</label>
+            <select
+              id='history-status-filter'
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className='input-field appearance-none'
             >
-              Logout
-            </button>
+              {STATUS_FILTERS.map((sf) => (
+                <option key={sf} value={sf}>
+                  {sf === 'all' ? 'All statuses' : sf.charAt(0).toUpperCase() + sf.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className='space-y-1'>
+            <label htmlFor='history-sort-order' className='text-xs text-ink-700'>Sort</label>
+            <select
+              id='history-sort-order'
+              value={sortNewest ? 'newest' : 'oldest'}
+              onChange={(e) => setSortNewest(e.target.value === 'newest')}
+              className='input-field appearance-none'
+            >
+              <option value='newest'>Newest first</option>
+              <option value='oldest'>Oldest first</option>
+            </select>
           </div>
         </div>
-      </nav>
+      )}
 
-      {/* Main Content */}
-      <div className='max-w-7xl mx-auto px-6 py-12'>
-        {/* Navigation Tabs */}
-        <div className='flex gap-3 mb-12 overflow-x-auto pb-2'>
-          <Link href='/dashboard' className='nav-link'>Dashboard</Link>
-          <Link href='/upload' className='nav-link'>Upload Data</Link>
-          <Link href='/statistics' className='nav-link'>Statistics</Link>
-          <Link href='/history' className='nav-link-active'>History</Link>
+      {error && (
+        <div className='status-banner status-banner-error'>
+          <p>{error}</p>
         </div>
+      )}
 
-        {/* Page Header */}
-        <div className='mb-12'>
-          <h2 className='text-4xl font-bold text-amber-900 mb-2'>Upload History</h2>
-          <p className='text-amber-700'>View all your uploaded files and analysis results</p>
+      {loading ? (
+        <div className='text-center py-12'>
+          <div className='loading-spinner mx-auto mb-3' />
+          <p className='text-ink-800'>Loading history...</p>
         </div>
+      ) : history.length === 0 ? (
+        <div className='text-center py-12'>
+          <p className='text-ink-900 font-semibold'>No uploads yet.</p>
+          <p className='text-sm text-ink-700 mt-2'>Upload your first file to start analysis.</p>
+          <Link href='/upload' className='btn-primary mt-5'>
+            Go to upload
+          </Link>
+        </div>
+      ) : (
+        <div className='space-y-4'>
+          {filteredHistory.length === 0 && (
+            <div className='text-center py-8'>
+              <p className='text-ink-700 text-sm'>No uploads match your filters.</p>
+            </div>
+          )}
+          {filteredHistory.map((item) => {
+            const isExpanded = expandedId === item.upload_id
+            const analysis = item.execution_id ? analysisByExecution[item.execution_id] : undefined
+            const result = analysis?.results
+            const isAnalysisLoading = item.execution_id ? analysisLoading[item.execution_id] : false
+            const isPreviewVisible = showContent[item.upload_id]
+            const preview = contentByUpload[item.upload_id]
 
-        {error && (
-          <div className='bg-rose-300/40 border border-rose-300/60 text-rose-800 px-4 py-3 rounded-lg mb-8 flex items-center gap-3'>
-            <span className='text-xl'>⚠️</span>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* History Cards */}
-        {loading ? (
-          <div className='flex justify-center items-center py-20'>
-            <div className='animate-spin rounded-full h-12 w-12 border-4 border-orange-400 border-t-amber-600'></div>
-            <p className='text-amber-900 ml-4 font-medium'>Loading files...</p>
-          </div>
-        ) : history.length === 0 ? (
-          <div className='bg-white/50 backdrop-blur-md rounded-2xl border border-white/40 p-12 text-center'>
-            <p className='text-amber-900 mb-4 text-lg'>📁 No files uploaded yet</p>
-            <Link href='/upload' className='text-orange-600 hover:text-orange-700 font-semibold text-lg'>
-              Upload your first file →
-            </Link>
-          </div>
-        ) : (
-          <div className='space-y-4'>
-            {history.map((item) => (
-              <div
-                key={item.upload_id}
-                className='bg-white/50 backdrop-blur-md rounded-2xl border border-white/40 overflow-hidden hover:border-white/60 transition-all duration-200'
-              >
-                {/* File Card Header */}
+            return (
+              <article key={item.upload_id} className='rounded-xl border border-brand-400/20 bg-white/50 p-4 overflow-hidden'>
                 <button
+                  type='button'
                   onClick={() => toggleExpanded(item.upload_id, item.execution_id)}
-                  className='w-full p-6 hover:bg-orange-100/20 transition-colors duration-200 text-left'
+                  className='w-full text-left'
                 >
-                  <div className='flex items-start justify-between'>
-                    <div className='flex items-start gap-4 flex-1'>
-                      {/* Status Icon */}
-                      <div className='text-3xl mt-1'>{getStatusIcon(item.status)}</div>
-
-                      {/* File Info */}
-                      <div className='flex-1'>
-                        <h3 className='text-xl font-bold text-amber-900 mb-2'>{item.file_name}</h3>
-                        <div className='flex items-center gap-4 text-sm text-amber-700'>
-                          <span>📅 {new Date(item.uploaded_at).toLocaleDateString()}</span>
-                          <span>🕐 {new Date(item.uploaded_at).toLocaleTimeString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <span
-                        className={`inline-block px-4 py-2 rounded-full text-sm font-semibold border ${getStatusBadge(
-                          item.status
-                        )} whitespace-nowrap`}
-                      >
-                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                      </span>
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='min-w-0'>
+                      <p className='font-semibold text-ink-950 truncate'>{item.file_name}</p>
+                      <p className='text-xs text-ink-700 mt-1'>
+                        Uploaded {new Date(item.uploaded_at).toLocaleDateString()} at{' '}
+                        {new Date(item.uploaded_at).toLocaleTimeString()}
+                      </p>
                     </div>
-
-                    {/* Expand Icon */}
-                    <div className='ml-4 text-gray-400 text-xl'>
-                      {expandedId === item.upload_id ? '▼' : '▶'}
+                    <div className='flex items-center gap-2'>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass(item.status)}`}>
+                        {item.status}
+                      </span>
+                      <span className='text-ink-700 text-sm'>{isExpanded ? 'Hide' : 'View'}</span>
                     </div>
                   </div>
                 </button>
 
-                {/* Expanded Details */}
-                {expandedId === item.upload_id && (
-                  <div className='border-t border-white/30 bg-orange-100/20 p-6'>
-                    <div className='space-y-6'>
-                      {item.status === 'completed' && item.execution_id ? (
-                        loadingAnalysis[item.execution_id] ? (
-                          <div className='flex items-center justify-center py-8'>
-                            <div className='animate-spin rounded-full h-8 w-8 border-3 border-orange-400 border-t-amber-600 mr-3'></div>
-                            <p className='text-amber-900 font-medium'>Loading analysis results...</p>
+                {isExpanded && (
+                  <div className='mt-4 border-t border-brand-400/20 pt-4 space-y-4'>
+                    {item.status === 'completed' && item.execution_id ? (
+                      isAnalysisLoading ? (
+                        <div className='status-banner status-banner-info'>
+                          <p>Loading analysis details...</p>
+                        </div>
+                      ) : result ? (
+                        <div className='space-y-4'>
+                          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                            <div className='metric-card'>
+                              <p className='metric-label'>ROIs</p>
+                              <p className='metric-value'>{result.n_rois}</p>
+                            </div>
+                            <div className='metric-card'>
+                              <p className='metric-label'>Timepoints</p>
+                              <p className='metric-value'>{result.n_timepoints}</p>
+                            </div>
                           </div>
-                        ) : analysisData[item.execution_id] ? (
-                          <div className='space-y-6'>
-                            {/* File Stats */}
-                            <div className='grid grid-cols-2 md:grid-cols-3 gap-4'>
-                              {analysisData[item.execution_id].num_rois && (
-                                <div className='bg-blue-200/40 rounded-lg p-4 border border-blue-200/60'>
-                                  <p className='text-amber-900 text-sm'>📊 ROIs</p>
-                                  <p className='text-2xl font-bold text-blue-700'>
-                                    {analysisData[item.execution_id].num_rois}
-                                  </p>
-                                </div>
-                              )}
-                              {analysisData[item.execution_id].num_timepoints && (
-                                <div className='bg-purple-200/40 rounded-lg p-4 border border-purple-200/60'>
-                                  <p className='text-amber-900 text-sm'>⏱️ Timepoints</p>
-                                  <p className='text-2xl font-bold text-purple-700'>
-                                    {analysisData[item.execution_id].num_timepoints}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
 
-                            {/* Correlation Stats */}
-                            <div>
-                              <h4 className='text-lg font-semibold text-amber-900 mb-4'>📈 Correlation Analysis</h4>
-                              <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-                                {analysisData[item.execution_id].pearson_mean !== undefined && (
-                                  <div className='bg-emerald-200/40 rounded-lg p-3 border border-emerald-200/60'>
-                                    <p className='text-amber-900 text-xs'>Pearson Mean</p>
-                                    <p className='text-lg font-bold text-emerald-700'>
-                                      {analysisData[item.execution_id].pearson_mean?.toFixed(3)}
-                                    </p>
-                                  </div>
-                                )}
-                                {analysisData[item.execution_id].pearson_median !== undefined && (
-                                  <div className='bg-emerald-200/40 rounded-lg p-3 border border-emerald-200/60'>
-                                    <p className='text-amber-900 text-xs'>Pearson Median</p>
-                                    <p className='text-lg font-bold text-emerald-700'>
-                                      {analysisData[item.execution_id].pearson_median?.toFixed(3)}
-                                    </p>
-                                  </div>
-                                )}
-                                {analysisData[item.execution_id].ledoit_wolf_mean !== undefined && (
-                                  <div className='bg-amber-200/40 rounded-lg p-3 border border-amber-200/60'>
-                                    <p className='text-amber-900 text-xs'>Ledoit-Wolf Mean</p>
-                                    <p className='text-lg font-bold text-amber-700'>
-                                      {analysisData[item.execution_id].ledoit_wolf_mean?.toFixed(3)}
-                                    </p>
-                                  </div>
-                                )}
-                                {analysisData[item.execution_id].ledoit_wolf_median !== undefined && (
-                                  <div className='bg-amber-200/40 rounded-lg p-3 border border-amber-200/60'>
-                                    <p className='text-amber-900 text-xs'>Ledoit-Wolf Median</p>
-                                    <p className='text-lg font-bold text-amber-700'>
-                                      {analysisData[item.execution_id].ledoit_wolf_median?.toFixed(3)}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Action Button */}
-                            <Link
-                              href={`/statistics?executionId=${item.execution_id}`}
-                              className='inline-block bg-gradient-to-r from-orange-400 to-amber-500 text-white font-semibold px-6 py-3 rounded-xl hover:from-orange-500 hover:to-amber-600 transition-all duration-200 shadow-lg shadow-orange-300/30 hover:shadow-orange-400/40'
-                            >
-                              View Full Analysis & Heatmap →
+                          <div className='flex flex-wrap gap-2'>
+                            <Link href={`/analysis/${item.execution_id}`} className='btn-primary'>
+                              Open analysis output
+                            </Link>
+                            <Link href={`/statistics?executionId=${item.execution_id}`} className='btn-secondary'>
+                              View statistics
                             </Link>
                           </div>
-                        ) : (
-                          <p className='text-amber-900'>No analysis data available</p>
-                        )
-                      ) : item.status === 'processing' || item.status === 'queued' ? (
-                        <div className='flex items-center gap-3 text-amber-800'>
-                          <div className='animate-spin rounded-full h-5 w-5 border-2 border-orange-400 border-t-transparent'></div>
-                          <p>
-                            {item.status === 'processing'
-                              ? 'Processing your file... This may take a few moments.'
-                              : 'File is queued for processing.'}
-                          </p>
                         </div>
                       ) : (
-                        <p className='text-rose-700'>⚠️ Analysis failed. Please try uploading again.</p>
-                      )}
-
-                      {/* File Preview */}
-                      <div className='bg-white/60 rounded-xl border border-white/60 p-4'>
-                        <div className='flex items-center justify-between mb-3'>
-                          <h4 className='text-lg font-semibold text-amber-900'>📄 File Preview</h4>
-                          <button
-                            onClick={() => toggleContent(item.upload_id)}
-                            className='text-sm font-semibold text-orange-700 hover:text-orange-800 bg-white/60 px-3 py-1 rounded-lg border border-white/60'
-                          >
-                            {showContent[item.upload_id] ? 'Hide' : 'View'}
-                          </button>
+                        <div className='status-banner status-banner-warning'>
+                          <p>Completed run has no analysis payload.</p>
                         </div>
-
-                        {!showContent[item.upload_id] && (
-                          <p className='text-amber-700 text-sm'>Preview the first 200 lines of your uploaded file.</p>
-                        )}
-
-                        {showContent[item.upload_id] && loadingContent[item.upload_id] && (
-                          <div className='flex items-center gap-2 text-amber-800'>
-                            <div className='animate-spin rounded-full h-4 w-4 border-2 border-orange-400 border-t-transparent'></div>
-                            <span>Loading file content...</span>
-                          </div>
-                        )}
-
-                        {showContent[item.upload_id] && contentError[item.upload_id] && (
-                          <p className='text-rose-700 text-sm'>{contentError[item.upload_id]}</p>
-                        )}
-
-                        {showContent[item.upload_id] && contentData[item.upload_id] && (
-                          <div className='mt-3'>
-                            <pre className='whitespace-pre-wrap text-xs text-amber-900 bg-orange-50/60 border border-orange-200/60 rounded-lg p-3 max-h-64 overflow-auto'>
-                              {contentData[item.upload_id].content}
-                            </pre>
-                            {contentData[item.upload_id].truncated && (
-                              <p className='text-amber-700 text-xs mt-2'>
-                                Preview truncated to {contentData[item.upload_id].lines_returned} lines.
-                              </p>
-                            )}
-                          </div>
+                      )
+                    ) : item.status === 'processing' || item.status === 'queued' ? (
+                      <div className='status-banner status-banner-info'>
+                        <p>{item.status === 'processing' ? 'Analysis is currently running.' : 'Analysis is queued.'}</p>
+                      </div>
+                    ) : (
+                      <div className='space-y-3'>
+                        <div className='status-banner status-banner-error'>
+                          <p>{analysis?.results?.error ?? 'Analysis failed for this upload.'}</p>
+                        </div>
+                        {item.execution_id && (
+                          <button
+                            type='button'
+                            className='btn-secondary'
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              try {
+                                await api.retryAnalysis(item.execution_id!)
+                                router.push(`/analysis/${item.execution_id}/loading`)
+                              } catch (retryErr: any) {
+                                setError(retryErr?.response?.data?.detail || 'Retry failed.')
+                              }
+                            }}
+                          >
+                            Retry analysis
+                          </button>
                         )}
                       </div>
+                    )}
+
+                    <div className='rounded-xl border border-brand-400/20 bg-white/75 p-4'>
+                      <div className='flex items-center justify-between gap-2'>
+                        <p className='font-semibold text-ink-900'>Input file preview</p>
+                        <button type='button' className='btn-secondary' onClick={() => toggleContent(item.upload_id)}>
+                          {isPreviewVisible ? 'Hide preview' : 'Show preview'}
+                        </button>
+                      </div>
+
+                      {isPreviewVisible && (
+                        <div className='mt-3'>
+                          {contentLoading[item.upload_id] && (
+                            <div className='status-banner status-banner-info'>
+                              <p>Loading file preview...</p>
+                            </div>
+                          )}
+
+                          {!contentLoading[item.upload_id] && contentError[item.upload_id] && (
+                            <div className='status-banner status-banner-error'>
+                              <p>{contentError[item.upload_id]}</p>
+                            </div>
+                          )}
+
+                          {!contentLoading[item.upload_id] && preview && (
+                            <div>
+                              <pre className='mono-data whitespace-pre-wrap rounded-xl border border-brand-400/20 bg-white p-3 max-h-72 overflow-auto text-ink-900'>
+                                {preview.content}
+                              </pre>
+                              {preview.truncated && (
+                                <p className='mt-2 text-xs text-ink-700'>
+                                  Preview truncated to {preview.lines_returned} lines.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

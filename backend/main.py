@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
+from app.core.model_registry import build_model_registry, ensure_model_registry_dir
+from app.core.preflight import run_dependency_preflight
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
 
@@ -24,6 +26,18 @@ app.add_middleware(
 # Include routers
 app.include_router(analytics_router)
 app.include_router(auth_router)
+
+
+@app.on_event("startup")
+async def startup_dependency_check():
+    """Print dependency health before serving requests."""
+    run_dependency_preflight(strict=settings.strict_dependency_check)
+    model_registry_dir = ensure_model_registry_dir(settings)
+    model_registry = build_model_registry(settings)
+    print(f"[Model Registry] Directory: {model_registry_dir}")
+    for score_name, metadata in model_registry["models"].items():
+        status = "FOUND" if metadata["exists"] else "MISSING"
+        print(f"  - {score_name}: {metadata['filename']} [{status}]")
 
 
 @app.get("/health")

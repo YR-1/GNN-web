@@ -13,6 +13,7 @@ class FileUploadRequest(BaseModel):
 class FileUploadResponse(BaseModel):
     """Schema for file upload response."""
     upload_id: str
+    execution_id: str
     status: str
     message: str
 

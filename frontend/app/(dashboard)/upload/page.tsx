@@ -1,276 +1,353 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import Link from 'next/link'
-import { useAuthStore } from '@/lib/store'
 import { api } from '@/lib/api'
 
-const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix'), {
-  ssr: false,
-  loading: () => <div className="flex justify-center items-center h-96"><div className="text-gray-500">Loading chart...</div></div>,
-})
+const ALLOWED_EXTENSIONS = new Set(['txt', 'csv', 'tsv'])
+
+function fileKey(file: File): string {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+function formatSizeKB(sizeInBytes: number): string {
+  return `${(sizeInBytes / 1024).toFixed(2)} KB`
+}
 
 export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
-  const [uploadId, setUploadId] = useState<string | null>(null)
-  const [executionId, setExecutionId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentUploadIndex, setCurrentUploadIndex] = useState(0)
+  const [currentUploadName, setCurrentUploadName] = useState('')
+  const [isDragActive, setIsDragActive] = useState(false)
   const [error, setError] = useState('')
-  const [analysisResults, setAnalysisResults] = useState<any | null>(null)
-  const { user, logout } = useAuthStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const acceptedExtensions = '.txt, .csv, .tsv'
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login')
+  const addSelectedFiles = (incoming: File[]) => {
+    if (incoming.length === 0) {
+      return
     }
-  }, [user, router])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      // Validate file extension
-      if (!selectedFile.name.endsWith('.txt')) {
-        setError('Only .txt files are allowed')
-        return
+    const validFiles: File[] = []
+    const invalidNames: string[] = []
+
+    for (const candidate of incoming) {
+      const ext = candidate.name.toLowerCase().split('.').pop()
+      if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+        invalidNames.push(candidate.name)
+        continue
       }
-      setFile(selectedFile)
+      validFiles.push(candidate)
+    }
+
+    setSelectedFiles((previous) => {
+      const existing = new Set(previous.map(fileKey))
+      const deduped = validFiles.filter((f) => !existing.has(fileKey(f)))
+      return [...previous, ...deduped]
+    })
+
+    if (invalidNames.length > 0) {
+      setError(`Ignored invalid file type: ${invalidNames.join(', ')}. Allowed: .txt, .csv, .tsv.`)
+    } else {
       setError('')
     }
   }
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!file) {
-      setError('Please select a TXT file')
+  const removeSelectedFile = (indexToRemove: number) => {
+    setSelectedFiles((previous) => previous.filter((_, index) => index !== indexToRemove))
+  }
+
+  const clearSelectedFiles = () => {
+    setSelectedFiles([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    addSelectedFiles(Array.from(event.target.files ?? []))
+    event.target.value = ''
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (uploading) return
+    setIsDragActive(true)
+  }
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (uploading) return
+    setIsDragActive(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    setIsDragActive(false)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (uploading) return
+    setIsDragActive(false)
+    addSelectedFiles(Array.from(event.dataTransfer.files ?? []))
+  }
+
+  const handleUpload = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (selectedFiles.length === 0) {
+      setError('Select at least one data file before uploading.')
       return
     }
 
     setUploading(true)
+    setUploadProgress(0)
+    setCurrentUploadIndex(0)
+    setCurrentUploadName('')
     setError('')
 
-    try {
-      const response = await api.uploadFile(file)
-      setUploadId(response.data.upload_id)
-      setExecutionId(response.data.execution_id || response.data.upload_id)
-      setFile(null)
-      
-      // Poll for results
-      pollForResults(response.data.execution_id || response.data.upload_id)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const pollForResults = async (execId: string, attempts = 0) => {
-    if (attempts > 30) {
-      setError('Analysis took too long. Please check back later.')
-      return
-    }
+    const executionIds: string[] = []
 
     try {
-      const response = await api.getAnalysis(execId)
-      if (response.data.status === 'completed') {
-        setAnalysisResults(response.data.results)
-      } else if (response.data.status === 'failed') {
-        setError(`Analysis failed: ${response.data.results?.error || 'Unknown error'}`)
+      for (let i = 0; i < selectedFiles.length; i += 1) {
+        const nextFile = selectedFiles[i]
+        setCurrentUploadIndex(i + 1)
+        setCurrentUploadName(nextFile.name)
+        setUploadProgress(0)
+
+        const response = await api.uploadFile(nextFile, (percent) => setUploadProgress(percent))
+        if (!response.data.execution_id) {
+          throw new Error(`Upload response is missing execution ID for ${nextFile.name}.`)
+        }
+        executionIds.push(response.data.execution_id)
+      }
+
+      clearSelectedFiles()
+
+      if (executionIds.length === 1) {
+        router.push(`/analysis/${executionIds[0]}/loading`)
       } else {
-        // Still processing, poll again
-        setTimeout(() => pollForResults(execId, attempts + 1), 1000)
+        router.push('/history')
       }
     } catch (err: any) {
-      setError('Failed to fetch analysis results')
+      if (err?.response?.status === 403 || err?.response?.status === 401) {
+        router.push('/login')
+        return
+      }
+      setError(err?.response?.data?.detail || err?.message || 'Upload failed.')
+    } finally {
+      setUploading(false)
+      setCurrentUploadIndex(0)
+      setCurrentUploadName('')
     }
   }
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/login')
-  }
-
-  if (!user) return null
-
   return (
-    <div className='min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50'>
-      {/* Navigation */}
-      <nav className='bg-white/50 backdrop-blur-md border-b border-white/40 sticky top-0 z-50'>
-        <div className='max-w-7xl mx-auto px-6 py-4 flex justify-between items-center'>
-          <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-gradient-to-br from-orange-400 to-amber-600 rounded-lg flex items-center justify-center shadow-md'>
-              <span className='text-white font-bold'>📊</span>
-            </div>
-            <h1 className='text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent'>
-              ROI Analyzer
-            </h1>
-          </div>
-          <div className='flex gap-4 items-center'>
-            <span className='text-amber-900 text-sm font-medium'>{user.email}</span>
-            <button
-              onClick={handleLogout}
-              className='bg-rose-300/60 hover:bg-rose-400/70 text-rose-800 px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-rose-300/30 font-medium'
-            >
-              Logout
-            </button>
-          </div>
+    <div className='page-container w-full max-w-5xl mx-auto'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
+        <div>
+          <h1 className='section-title'>Upload Data</h1>
+          <p className='section-subtitle'>
+            Add one or more ROI time-series matrices to start connectivity analysis and prediction.
+          </p>
         </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className='max-w-7xl mx-auto px-6 py-12'>
-        {/* Navigation Tabs */}
-        <div className='flex gap-3 mb-12 overflow-x-auto pb-2'>
-          <Link
-            href='/dashboard'
-            className='nav-link'
-          >
-            Dashboard
-          </Link>
-          <Link
-            href='/upload'
-            className='nav-link-active'
-          >
-            Upload Data
-          </Link>
-          <Link
-            href='/statistics'
-            className='nav-link'
-          >
-            Statistics
-          </Link>
-          <Link
-            href='/history'
-            className='nav-link'
-          >
-            History
-          </Link>
-        </div>
-
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
-          {/* Upload Form */}
-          <div className='bg-white/50 backdrop-blur-md rounded-2xl shadow-lg p-8 border border-white/40 hover:border-white/60 transition-all duration-300'>
-            <div className='mb-8'>
-              <h2 className='text-3xl font-bold text-amber-900 mb-2'>Upload Data</h2>
-              <p className='text-amber-700'>Upload your ROI time-series data for correlation analysis</p>
-            </div>
-
-            {error && (
-              <div className='bg-rose-300/40 border border-rose-300/60 text-rose-800 px-4 py-3 rounded-lg mb-4 flex items-center gap-3'>
-                <span className='text-xl'>⚠️</span>
-                <p>{error}</p>
-              </div>
-            )}
-
-            {uploadId && !analysisResults && (
-              <div className='bg-blue-200/40 border border-blue-200/60 text-blue-900 px-4 py-3 rounded-lg mb-4 flex items-center gap-3'>
-                <span className='animate-spin'>⏳</span>
-                <div>
-                  <p className='font-semibold'>Processing...</p>
-                  <p className='text-sm text-blue-800'>Analyzing correlation matrix</p>
-                </div>
-              </div>
-            )}
-
-            {uploadId && analysisResults && (
-              <div className='bg-emerald-200/40 border border-emerald-200/60 text-emerald-900 px-4 py-3 rounded-lg mb-4 flex items-center gap-3'>
-                <span className='text-xl'>✨</span>
-                <div>
-                  <p className='font-semibold'>Analysis Complete!</p>
-                  <p className='text-sm text-emerald-800'>
-                    {analysisResults.n_rois} ROIs • {analysisResults.n_timepoints} timepoints
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleUpload} className='space-y-6'>
-              <div>
-                <label className='block text-amber-900 font-semibold mb-3'>
-                  Select TXT File
-                </label>
-                <div className='relative'>
-                  <input
-                    type='file'
-                    accept='.txt'
-                    onChange={handleFileChange}
-                    disabled={uploading}
-                    className='w-full px-4 py-3 bg-white/30 border-2 border-white/30 rounded-lg text-amber-900 placeholder-amber-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:opacity-50 transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-orange-400 file:text-white hover:file:bg-orange-500'
-              />
-                </div>
-                {file && (
-                  <div className='mt-3 p-3 bg-orange-100/40 rounded-lg border border-orange-200/60'>
-                    <p className='text-sm text-amber-900'>
-                      <span className='font-semibold'>📄 {file.name}</span>
-                      <span className='ml-2 text-amber-700'>({(file.size / 1024).toFixed(2)} KB)</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type='submit'
-                disabled={uploading || !file}
-                className='w-full bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:shadow-orange-300/40 flex items-center justify-center gap-2'
-              >
-                {uploading ? (
-                  <>
-                    <span className='animate-spin'>⏳</span>
-                    Uploading & Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <span>⬆️</span>
-                    Upload & Analyze
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className='mt-8 p-4 bg-orange-100/30 border border-orange-200/50 rounded-lg'>
-              <p className='text-amber-900 font-semibold mb-3 flex items-center gap-2'>
-                <span>ℹ️</span> Expected Format
-              </p>
-              <ul className='space-y-2 text-amber-800 text-sm'>
-                <li className='flex items-center gap-2'>
-                  <span className='text-orange-500'>•</span>
-                  Tab or space-separated values
-                </li>
-                <li className='flex items-center gap-2'>
-                  <span className='text-orange-500'>•</span>
-                  T × N_ROI (timepoints × ROI regions)
-                </li>
-                <li className='flex items-center gap-2'>
-                  <span className='text-orange-500'>•</span>
-                  Common: 268 ROIs (Shen atlas)
-                </li>
-                <li className='flex items-center gap-2'>
-                  <span className='text-orange-500'>•</span>
-                  Numeric values only
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Correlation Matrix Visualization */}
-          {analysisResults && (
-            <div className='bg-white/50 backdrop-blur-md rounded-2xl shadow-lg p-8 border border-white/40 hover:border-white/60 transition-all duration-300'>
-              <div className='mb-6'>
-                <h2 className='text-2xl font-bold text-amber-900'>Correlation Matrix</h2>
-                <p className='text-amber-700 text-sm mt-1'>{analysisResults.file_name}</p>
-              </div>
-              <CorrelationMatrix 
-                data={analysisResults}
-                fileName={analysisResults.file_name}
-              />
-            </div>
-          )}
-
-        </div>
+        <p className='rounded-full border border-brand-400/20 bg-white/70 px-3 py-1 text-xs font-medium text-ink-700'>
+          Research workflow
+        </p>
       </div>
+
+      {error && (
+        <div className='status-banner status-banner-error'>
+          <p>{error}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleUpload} className='grid gap-5 lg:grid-cols-[1.45fr_0.95fr]'>
+        <div className=' space-y-4'>
+            <div
+              role='button'
+              tabIndex={0}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  if (!uploading) {
+                    fileInputRef.current?.click()
+                  }
+                }
+              }}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`min-h-[260px] rounded-2xl border-2 border-dashed p-8 text-center transition ${
+                isDragActive
+                  ? 'border-brand-600 bg-brand-400/10'
+                  : 'border-brand-400/30 bg-white/80 hover:border-brand-600/60 hover:bg-white/90'
+              } ${uploading ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+              aria-label='Drag and drop data files here or click to browse'
+            >
+              <input
+                ref={fileInputRef}
+                id='roi-file'
+                type='file'
+                multiple
+                accept='.txt,.csv,.tsv'
+                disabled={uploading}
+                onChange={handleFileChange}
+                className='hidden'
+              />
+              <div className='mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-400/30 bg-white/90'>
+                <svg
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='1.8'
+                  className='h-7 w-7 text-brand-700'
+                  aria-hidden='true'
+                >
+                  <path d='M12 16V5m0 0 4 4m-4-4-4 4' strokeLinecap='round' strokeLinejoin='round' />
+                  <path d='M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3' strokeLinecap='round' />
+                </svg>
+              </div>
+              <p className='font-semibold text-ink-900'>Drop your file(s) here</p>
+              <p className='mt-2 text-sm text-ink-700'>
+                or{' '}
+                <span className='font-medium text-brand-700 underline underline-offset-2 decoration-brand-500'>
+                  click to browse
+                </span>{' '}
+                from your device
+              </p>
+              <p className='mt-3 text-xs text-ink-700'>Accepted formats: {acceptedExtensions}</p>
+            </div>
+
+            {selectedFiles.length > 0 && (
+              <div className='rounded-xl border border-brand-400/20 bg-white/85 p-3 space-y-2 transition-colors hover:border-brand-600/40'>
+                <div className='flex items-center justify-between'>
+                  <p className='text-sm font-medium text-ink-950'>Selected files ({selectedFiles.length})</p>
+                  <button
+                    type='button'
+                    onClick={clearSelectedFiles}
+                    disabled={uploading}
+                    className='text-xs text-ink-700 hover:text-ink-950 underline underline-offset-2 disabled:no-underline disabled:opacity-50'
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <ul className='space-y-2 max-h-56 overflow-auto pr-1'>
+                  {selectedFiles.map((selectedFile, index) => (
+                    <li
+                      key={fileKey(selectedFile)}
+                      className='flex items-center justify-between gap-3 rounded-lg border border-brand-400/20 bg-white/90 px-3 py-2 transition-colors hover:border-brand-600/45'
+                    >
+                      <div className='min-w-0'>
+                        <p className='text-sm font-medium text-ink-900 truncate'>{selectedFile.name}</p>
+                        <p className='text-xs text-ink-700'>{formatSizeKB(selectedFile.size)}</p>
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() => removeSelectedFile(index)}
+                        disabled={uploading}
+                        aria-label={`Delete ${selectedFile.name}`}
+                        title={`Delete ${selectedFile.name}`}
+                        className='shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-200 text-rose-700 transition-colors hover:border-rose-400 hover:bg-rose-50 disabled:opacity-50'
+                      >
+                        <svg
+                          viewBox='0 0 24 24'
+                          fill='none'
+                          stroke='currentColor'
+                          strokeWidth='1.8'
+                          className='h-4 w-4'
+                          aria-hidden='true'
+                        >
+                          <path d='M3 6h18' strokeLinecap='round' />
+                          <path d='M8 6V4h8v2' strokeLinecap='round' strokeLinejoin='round' />
+                          <path d='M19 6l-1 14H6L5 6' strokeLinecap='round' strokeLinejoin='round' />
+                          <path d='M10 11v6M14 11v6' strokeLinecap='round' />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {uploading && (
+              <div className='rounded-xl border border-brand-400/20 bg-white/80 p-3'>
+                <div className='flex items-center justify-between text-xs text-ink-700 mb-2'>
+                  <span>
+                    Uploading file {currentUploadIndex} of {selectedFiles.length}
+                    {currentUploadName ? `: ${currentUploadName}` : ''}
+                  </span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className='w-full rounded-full bg-brand-400/20 h-2.5 overflow-hidden'>
+                  <div
+                    className='h-full rounded-full transition-all duration-300'
+                    style={{
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(120deg, var(--brand-500), var(--brand-700))',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className='flex flex-col sm:flex-row gap-3'>
+              <button type='submit' disabled={uploading || selectedFiles.length === 0} className='btn-upload-primary flex-1'>
+                {uploading ? 'Uploading and analyzing...' : `Upload and analyze (${selectedFiles.length})`}
+              </button>
+              <button
+                type='button'
+                disabled={uploading || selectedFiles.length === 0}
+                onClick={clearSelectedFiles}
+                className='btn-upload-secondary disabled:opacity-50 disabled:cursor-not-allowed'
+              >
+                Clear file list
+              </button>
+            </div>
+          </div>
+
+          <aside className=' space-y-4'>
+            <div>
+              <p className='text-sm font-semibold text-ink-950'>File Requirements</p>
+              <p className='mt-1 text-xs text-ink-700'>Keep matrix orientation and ROI count consistent with your study setup.</p>
+            </div>
+            <ul className='space-y-2 text-sm text-ink-700'>
+              <li className='flex items-start gap-2'>
+                <span className='mt-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-600' />
+                Plain-text numeric matrix (.txt, .csv, .tsv)
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='mt-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-600' />
+                Rows = timepoints, columns = ROI regions
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='mt-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-600' />
+                Typical input uses 268 ROI columns (Shen atlas)
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='mt-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-600' />
+                Header rows should be removed before upload
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='mt-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-600' />
+                Multiple files are uploaded sequentially via the existing API
+              </li>
+            </ul>
+            <div className='rounded-xl border border-brand-400/20 bg-white/85 p-3 text-xs text-ink-700'>
+              After upload: single file opens its loading page, multiple files redirect to history for tracking.
+            </div>
+          </aside>
+        </form>
+
+        <div className='rounded-xl border border-brand-400/20 bg-white/70 px-4 py-3 text-xs text-ink-700'>
+          Tip: If your matrix was exported as ROI x timepoints, the backend auto-detects and transposes it when possible.
+        </div>
     </div>
   )
 }
-

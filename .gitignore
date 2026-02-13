@@ -3,6 +3,7 @@
 # Frontend
 frontend/node_modules/
 frontend/.next/
+frontend/.next-build-verify/
 frontend/out/
 frontend/build/
 frontend/.env.local
@@ -10,6 +11,7 @@ frontend/.env.*.local
 frontend/*.pem
 
 # Backend
+__pycache__/
 backend/venv/
 backend/__pycache__/
 backend/*.py[cod]
@@ -21,6 +23,7 @@ backend/ENV/
 backend/.venv
 backend/.env
 backend/.env.*.local
+backend/models/*.pt
 
 # IDE
 .vscode/
@@ -61,8 +64,11 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+backend/.runtime/
 
 # Dependencies lock files (optional - keep them for reproducible builds)
 # package-lock.json
 # yarn.lock
 # Pipfile.lock
+
+.claude/

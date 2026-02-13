@@ -10,6 +10,11 @@ The notebook demonstrates:
 - Generating interactive Plotly heatmap visualizations
 - Statistical analysis of ROI correlations
 
+Additional preprocessing scripts:
+- `step1_compute_ldw.py`: cleaning + sliding-window LDW correlation/adjacency extraction
+- `step2_prepare_data.py`: sequence padding and PyG graph conversion
+- `convert_txt_to_graph.py`: single-file conversion to graph windows for inference payloads
+
 ## Important Note
 **The backend has extracted and integrated all logic from this notebook.** 
 

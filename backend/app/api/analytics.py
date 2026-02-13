@@ -7,29 +7,44 @@ from ..models.schemas import (
     FileUploadResponse,
     ModelExecutionResponse,
     AnalysisResponse,
-    DashboardStats,
     ExecutionStatus,
     UploadContentResponse,
 )
 from ..core.security import verify_token
 from ..core.config import get_settings
-from ..services.model_service import process_txt_data, store_execution_results, execute_notebook_with_file
-from ..services.database import get_db_connection
+from ..core.model_registry import build_model_registry
+from ..services.model_service import process_txt_data
+from ..services.database import (
+    create_upload_and_execution,
+    get_analysis_row,
+    get_dashboard_stats,
+    get_execution_for_retry,
+    get_history_rows,
+    get_status_row,
+    get_upload_file_row,
+    set_execution_status,
+)
 from datetime import datetime
 import json
 
 router = APIRouter(prefix="/api", tags=["analytics"])
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {".txt"}
+ALLOWED_EXTENSIONS = {".txt", ".csv", ".tsv"}
 CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
-async def _get_conn_or_500():
-    try:
-        return await get_db_connection()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+def _parse_json_field(value):
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return None
+    return value
 
 
 @router.post("/upload", response_model=FileUploadResponse)
@@ -39,8 +54,8 @@ async def upload_file(
     token_data: dict = Depends(verify_token),
 ) -> FileUploadResponse:
     """
-    Upload TXT file (ROI time-series data) and trigger background correlation analysis.
-    Returns upload_id for tracking.
+    Upload TXT file (ROI time-series data) and trigger background analysis/prediction pipeline.
+    Returns upload_id and execution_id for tracking.
     """
     settings = get_settings()
 
@@ -49,7 +64,7 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Missing file name")
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only .txt files are allowed")
+        raise HTTPException(status_code=400, detail="Only .txt, .csv, and .tsv files are allowed")
     
     user_id = token_data.get("sub")
     upload_id = str(uuid.uuid4())
@@ -58,7 +73,7 @@ async def upload_file(
     # Save file locally for processing (stream to avoid large memory usage)
     tmp_dir = Path(settings.upload_tmp_dir or gettempdir())
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    file_path = tmp_dir / f"{upload_id}.txt"
+    file_path = tmp_dir / f"{upload_id}{ext}"
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
 
     file_size = 0
@@ -87,42 +102,25 @@ async def upload_file(
             file_path.unlink()
         raise HTTPException(status_code=400, detail="Empty file uploaded")
     
-    # Record in database
-    conn = await _get_conn_or_500()
     try:
-        async with conn.transaction():
-            await conn.execute(
-                """
-                INSERT INTO file_uploads (upload_id, user_id, file_name, file_size, file_path, status, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                """,
-                upload_id,
-                user_id,
-                file.filename,
-                file_size,
-                str(file_path),
-                "uploaded",
-                datetime.utcnow(),
-            )
-            await conn.execute(
-                """
-                INSERT INTO model_executions (execution_id, upload_id, user_id, status, created_at)
-                VALUES ($1, $2, $3, $4, $5)
-                """,
-                execution_id,
-                upload_id,
-                user_id,
-                "queued",
-                datetime.utcnow(),
-            )
-    finally:
-        await conn.close()
+        await create_upload_and_execution(
+            upload_id=upload_id,
+            execution_id=execution_id,
+            user_id=user_id,
+            file_name=file.filename,
+            file_size=file_size,
+            file_path=str(file_path),
+            created_at=datetime.utcnow(),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not write upload metadata: {exc}")
     
-    # Add background task to process TXT and compute correlation matrix using the notebook
-    background_tasks.add_task(execute_notebook_with_file, str(file_path), execution_id, user_id, file.filename, file_size)
+    # Add background task to process TXT using single-pass analysis/prediction pipeline
+    background_tasks.add_task(process_txt_data, str(file_path), execution_id, user_id, file.filename, file_size)
     
     return FileUploadResponse(
         upload_id=upload_id,
+        execution_id=execution_id,
         status="queued",
         message="TXT file uploaded successfully. Correlation matrix analysis started.",
     )
@@ -139,33 +137,22 @@ async def get_analysis(
     """
     user_id = token_data.get("sub")
     
-    conn = await _get_conn_or_500()
     try:
-        row = await conn.fetchrow(
-            """
-            SELECT me.execution_id, fu.upload_id, me.status, me.results, me.completed_at
-            FROM model_executions me
-            JOIN file_uploads fu ON me.upload_id = fu.upload_id
-            WHERE me.execution_id = $1 AND me.user_id = $2
-            """,
-            execution_id,
-            user_id,
-        )
-    finally:
-        await conn.close()
+        row = await get_analysis_row(execution_id=execution_id, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch analysis: {exc}")
     
     if not row:
         raise HTTPException(status_code=404, detail="Execution not found")
     
-    execution_id, upload_id, status, results_json, completed_at = row
-    results = json.loads(results_json) if results_json else None
+    results = _parse_json_field(row.get("results"))
     
     return AnalysisResponse(
-        upload_id=upload_id,
-        execution_id=execution_id,
-        status=status,
+        upload_id=row["upload_id"],
+        execution_id=row["execution_id"],
+        status=row["status"],
         results=results,
-        completed_at=completed_at,
+        completed_at=row.get("completed_at"),
     )
 
 
@@ -177,31 +164,22 @@ async def get_status(
     """Check execution status with real-time updates."""
     user_id = token_data.get("sub")
     
-    conn = await _get_conn_or_500()
     try:
-        row = await conn.fetchrow(
-            """
-            SELECT execution_id, status, results
-            FROM model_executions
-            WHERE execution_id = $1 AND user_id = $2
-            """,
-            execution_id,
-            user_id,
-        )
-    finally:
-        await conn.close()
+        row = await get_status_row(execution_id=execution_id, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch status: {exc}")
     
     if not row:
         raise HTTPException(status_code=404, detail="Execution not found")
     
-    execution_id, status, results_json = row
-    results = json.loads(results_json) if results_json else None
+    status = row["status"]
+    results = _parse_json_field(row.get("results"))
     
     # Calculate progress
     progress = 100 if status == "completed" else (50 if status == "processing" else 0)
     
     return ExecutionStatus(
-        execution_id=execution_id,
+        execution_id=row["execution_id"],
         status=status,
         progress=progress,
         results=results,
@@ -215,32 +193,20 @@ async def get_history(
     """Get user's upload history."""
     user_id = token_data.get("sub")
     
-    conn = await _get_conn_or_500()
     try:
-        rows = await conn.fetch(
-            """
-            SELECT fu.upload_id, fu.file_name, fu.created_at, fu.status, me.execution_id
-            FROM file_uploads fu
-            LEFT JOIN model_executions me ON fu.upload_id = me.upload_id
-            WHERE fu.user_id = $1
-            ORDER BY fu.created_at DESC
-            LIMIT 50
-            """,
-            user_id,
-        )
-    finally:
-        await conn.close()
-    
-    return [
-        {
-            "upload_id": row["upload_id"],
-            "file_name": row["file_name"],
-            "uploaded_at": row["created_at"],
-            "status": row["status"],
-            "execution_id": row["execution_id"],
-        }
-        for row in rows
-    ]
+        return await get_history_rows(user_id=user_id, limit=50)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch history: {exc}")
+
+
+@router.get("/models")
+async def get_model_registry(
+    token_data: dict = Depends(verify_token),
+):
+    """Return configured score->model file mapping and availability."""
+    _ = token_data.get("sub")
+    settings = get_settings()
+    return build_model_registry(settings)
 
 
 @router.get("/upload/{upload_id}/content", response_model=UploadContentResponse)
@@ -255,24 +221,16 @@ async def get_upload_content(
     max_lines = max(1, min(max_lines, 1000))
     max_chars = max(1000, min(max_chars, 200000))
 
-    conn = await _get_conn_or_500()
     try:
-        row = await conn.fetchrow(
-            """
-            SELECT file_name, file_path
-            FROM file_uploads
-            WHERE upload_id = $1 AND user_id = $2
-            """,
-            upload_id,
-            user_id,
-        )
-    finally:
-        await conn.close()
+        row = await get_upload_file_row(upload_id=upload_id, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch upload content: {exc}")
 
     if not row:
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    file_name, file_path = row
+    file_name = row["file_name"]
+    file_path = row["file_path"]
     path = Path(file_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File not found on server")
@@ -308,13 +266,44 @@ async def get_upload_content(
     )
 
 
-@router.get("/dashboard", response_model=DashboardStats)
-async def get_dashboard_stats() -> DashboardStats:
-    """Get dashboard statistics."""
-    # For now, return dummy stats (no auth required for demo)
-    return DashboardStats(
-        total_uploads=2,
-        completed_analyses=1,
-        pending_analyses=1,
-        avg_processing_time=5.2,
-    )
+@router.post("/retry/{execution_id}")
+async def retry_analysis(
+    execution_id: str,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    token_data: dict = Depends(verify_token),
+):
+    """Retry a failed analysis execution."""
+    user_id = token_data.get("sub")
+
+    try:
+        row = await get_execution_for_retry(execution_id=execution_id, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not look up execution: {exc}")
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Execution not found or is not in failed status")
+
+    file_path = row.get("file_path", "")
+    if not file_path or not Path(file_path).exists():
+        raise HTTPException(status_code=410, detail="Original file no longer available. Please re-upload.")
+
+    file_name = row.get("file_name", "unknown")
+    file_size = row.get("file_size", 0)
+
+    await set_execution_status(execution_id, user_id, "queued")
+    background_tasks.add_task(process_txt_data, file_path, execution_id, user_id, file_name, file_size)
+
+    return {"execution_id": execution_id, "status": "queued", "message": "Analysis has been re-queued."}
+
+
+@router.get("/dashboard")
+async def dashboard_stats(
+    token_data: dict = Depends(verify_token),
+):
+    """Get dashboard statistics from real data."""
+    user_id = token_data.get("sub")
+    try:
+        stats = await get_dashboard_stats(user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch dashboard stats: {exc}")
+    return stats

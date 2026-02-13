@@ -27,7 +27,7 @@ export const api = {
   logout: () => apiClient.post('/api/auth/logout'),
 
   // Analytics
-  uploadFile: (file: File) => {
+  uploadFile: (file: File, onUploadProgress?: (percent: number) => void) => {
     const formData = new FormData()
     formData.append('file', file)
     const authHeader = apiClient.defaults.headers.common['Authorization']
@@ -36,6 +36,12 @@ export const api = {
         'Content-Type': 'multipart/form-data',
         ...(authHeader && { 'Authorization': authHeader }),
       },
+      onUploadProgress: onUploadProgress
+        ? (event) => {
+            const percent = event.total ? Math.round((event.loaded / event.total) * 100) : 0
+            onUploadProgress(percent)
+          }
+        : undefined,
     })
   },
   getAnalysis: (executionId: string) =>
@@ -46,4 +52,6 @@ export const api = {
   getUploadContent: (uploadId: string, params?: { max_lines?: number; max_chars?: number }) =>
     apiClient.get(`/api/upload/${uploadId}/content`, { params }),
   getDashboardStats: () => apiClient.get('/api/dashboard'),
+  retryAnalysis: (executionId: string) =>
+    apiClient.post(`/api/retry/${executionId}`),
 }

@@ -2,30 +2,61 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/lib/store'
+
+const formatLoginError = (rawMessage: string) => {
+  const message = rawMessage.toLowerCase()
+
+  if (message.includes('invalid login credentials')) {
+    return 'Invalid email or password. Please try again.'
+  }
+  if (message.includes('email not confirmed')) {
+    return 'Please confirm your email before signing in.'
+  }
+  if (message.includes('too many requests')) {
+    return 'Too many attempts. Please wait a moment and try again.'
+  }
+  if (message.includes('network')) {
+    return 'Network error while signing in. Please check your connection.'
+  }
+
+  return rawMessage
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [capsLockOn, setCapsLockOn] = useState(false)
   const router = useRouter()
-  const { login } = useAuthStore()
+  const { login, user, loading: authLoading } = useAuthStore()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard')
+    }
+  }, [authLoading, user, router])
+
+  const isSubmitDisabled = submitting || authLoading || !email.trim() || password.length === 0
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault()
-    setLoading(true)
+    if (isSubmitDisabled) return
+
+    setSubmitting(true)
     setError('')
 
     try {
-      await login(email, password)
-      router.push('/dashboard')
+      await login(email.trim(), password)
+      router.replace('/dashboard')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'
-      setError(message)
+      setError(formatLoginError(message))
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -44,9 +75,12 @@ export default function LoginPage() {
             <p className='section-subtitle text-center mt-2'>
               Sign in to continue your ROI correlation workflow.
             </p>
+            <p className='text-xs text-ink-700 text-center mt-2'>
+              Your session is kept in this browser for faster return access.
+            </p>
 
             {error && (
-              <div className='status-banner status-banner-error mt-6'>
+              <div className='status-banner status-banner-error mt-6' role='alert' aria-live='polite'>
                 <p>{error}</p>
               </div>
             )}
@@ -65,6 +99,8 @@ export default function LoginPage() {
                   placeholder='you@example.com'
                   className='input-field'
                   autoComplete='email'
+                  inputMode='email'
+                  disabled={submitting || authLoading}
                 />
               </div>
 
@@ -72,20 +108,36 @@ export default function LoginPage() {
                 <label htmlFor='password' className='block mb-2 text-sm font-semibold text-ink-800'>
                   Password
                 </label>
-                <input
-                  id='password'
-                  type='password'
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder='Enter your password'
-                  className='input-field'
-                  autoComplete='current-password'
-                />
+                <div className='relative'>
+                  <input
+                    id='password'
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onKeyUp={(event) => setCapsLockOn(event.getModifierState('CapsLock'))}
+                    onBlur={() => setCapsLockOn(false)}
+                    placeholder='Enter your password'
+                    className='input-field pr-16'
+                    autoComplete='current-password'
+                    disabled={submitting || authLoading}
+                  />
+                  <button
+                    type='button'
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className='absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-brand-700 hover:text-brand-600'
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {capsLockOn && (
+                  <p className='mt-2 text-xs text-amber-700'>Caps Lock is on.</p>
+                )}
               </div>
 
-              <button type='submit' disabled={loading} className='btn-primary w-full'>
-                {loading ? 'Signing in...' : 'Sign In'}
+              <button type='submit' disabled={isSubmitDisabled} className='btn-primary w-full'>
+                {submitting ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
 

@@ -18,10 +18,15 @@ const displayFont = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: {
-    default: 'ROI Analyzer',
-    template: '%s | ROI Analyzer',
+    default: 'MindPulse',
+    template: '%s | MindPulse',
   },
-  description: 'Neuroimaging ROI correlation analysis platform. Upload fMRI time-series data, compute connectivity matrices, and explore brain network visualizations.',
+  description: 'Advanced brain connectivity analysis platform. Upload fMRI time-series data, predict cognitive outcomes, and explore neural network patterns with graph neural networks.',
+  icons: {
+    icon: [{ url: '/icon.png', type: 'image/png' }],
+    shortcut: ['/icon.png'],
+    apple: ['/apple-icon.png'],
+  },
 }
 
 export default function RootLayout({

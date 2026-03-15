@@ -178,7 +178,7 @@
   }
 
   .brand-title {
-    @apply font-display text-base font-semibold;
+    @apply font-display text-[1.75rem] leading-none font-semibold;
     color: var(--ink-950);
   }
 

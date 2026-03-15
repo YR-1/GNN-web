@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -65,9 +66,8 @@ export default function LoginPage() {
       <div className='noise-overlay' aria-hidden='true' />
       <section className='page-shell min-h-screen flex items-center justify-center'>
         <div className='w-full max-w-md fade-in-up'>
-          <div className='mb-5 flex items-center justify-center gap-3'>
-            <div className='brand-mark'>RA</div>
-            <p className='font-display text-xl text-ink-950'>ROI Analyzer</p>
+          <div className='flex items-center justify-center'>
+            <Image src='/fyp-logo.png' alt='MindPulse' width={200} height={200} className='rounded-xl' />
           </div>
 
           <div className='surface-card-strong'>

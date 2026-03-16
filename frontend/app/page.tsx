@@ -12,16 +12,17 @@ export default function RootPage() {
         <div className='absolute inset-0 bg-gradient-to-br from-brand-500/5 via-transparent to-brand-500/5' />
         <div className='max-w-7xl mx-auto px-6 py-20 relative'>
           <div className='max-w-4xl mx-auto text-center'>
-            <div className='flex justify-center mb-6'>
+            <div className='flex items-center justify-center gap-3 sm:gap-4 mb-6'>
               <div className='w-20 h-20 rounded-2xl flex items-center justify-center'>
                 <Image
                   src='/fyp-logo-brain.png'
                   alt='MindPulse logo'
                   width={72}
-                  height={76}
-                  className='h-[76px] w-[72px] object-contain'
+                  height={72}
+                  className='h-[72px] w-[72px] object-contain'
                 />
               </div>
+              <span className='font-display text-2xl sm:text-3xl font-bold text-ink-950'>MindPulse</span>
             </div>
             <h1 className='text-4xl sm:text-5xl font-display font-bold text-ink-950 mb-6'>
               Predict Human Behavior from Brain Activity

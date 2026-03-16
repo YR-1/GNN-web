@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/upload', label: 'Upload Data' },
   { href: '/predictions', label: 'Predictions' },
+  { href: '/model-performance', label: 'Model Performance' },
   { href: '/statistics', label: 'Statistics' },
   { href: '/history', label: 'History' },
 ]

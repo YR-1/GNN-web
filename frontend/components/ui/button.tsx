@@ -2,7 +2,7 @@ import React from 'react'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg'
-  variant?: 'default' | 'outline' | 'secondary'
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost'
 }
 
 export function Button({
@@ -22,6 +22,7 @@ export function Button({
     default: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm',
     outline: 'border border-brand-600 text-brand-600 hover:bg-blue-50 bg-transparent',
     secondary: 'bg-white text-brand-700 hover:bg-gray-50 shadow-sm',
+    ghost: 'bg-transparent text-ink-800 hover:bg-slate-100 shadow-none',
   }
 
   return (

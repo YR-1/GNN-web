@@ -1,10 +1,14 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { cookies } from 'next/headers'
 import { Brain, TrendingUp, Zap, BarChart3, Users, CheckCircle2, ArrowRight, TestTubeDiagonal } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 
 export default function RootPage() {
+  const token = cookies().get('token')?.value
+  const docsHref = token ? '/documentation' : '/login?from=%2Fdocumentation'
+
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
@@ -37,7 +41,7 @@ export default function RootPage() {
                   <ArrowRight className='w-4 h-4 ml-2' />
                 </Button>
               </Link>
-              <Link href='/login'>
+              <Link href={docsHref}>
                 <Button size='lg' variant='outline'>
                   View Documentation
                 </Button>

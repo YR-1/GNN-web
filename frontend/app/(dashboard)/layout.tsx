@@ -9,8 +9,9 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/upload', label: 'Upload Data' },
   { href: '/predictions', label: 'Predictions' },
-  { href: '/model-performance', label: 'Model Performance' },
   { href: '/history', label: 'History' },
+    { href: '/model-performance', label: 'Model Performance' }, 
+    { href: '/documentation', label: 'Documentation' },
 ]
 
 const isActivePath = (pathname: string, href: string) =>

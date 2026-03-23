@@ -6,6 +6,7 @@ frontend/.next/
 frontend/.next-build-verify/
 frontend/out/
 frontend/build/
+frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
 frontend/*.pem

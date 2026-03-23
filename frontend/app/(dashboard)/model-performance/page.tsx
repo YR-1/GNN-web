@@ -1,26 +1,44 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye } from 'lucide-react'
-import { ScatterPlot } from '@/components/charts/ScatterPlot'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { api } from '@/lib/api'
 import { modelPerformanceData, ModelPerformance } from '@/lib/model-performance-data'
 
 type SortField = 'behavioralScore' | 'correlation' | 'pValue' | 'mse'
 type SortDirection = 'asc' | 'desc' | null
 
 export default function ModelPerformancePage() {
-  const [selectedModel, setSelectedModel] = useState<ModelPerformance | null>(null)
+  const [performanceData, setPerformanceData] = useState<ModelPerformance[]>(modelPerformanceData)
+  const [loadingData, setLoadingData] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
 
-  const sortedData = useMemo(() => {
-    if (!sortField || !sortDirection) return modelPerformanceData
+  useEffect(() => {
+    const fetchPerformanceData = async () => {
+      try {
+        const response = await api.getModelPerformance()
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          setPerformanceData(response.data as ModelPerformance[])
+        }
+      } catch (error) {
+        setLoadError('Unable to load model performance from backend. Showing local fallback data.')
+      } finally {
+        setLoadingData(false)
+      }
+    }
 
-    return [...modelPerformanceData].sort((a, b) => {
+    void fetchPerformanceData()
+  }, [])
+
+  const sortedData = useMemo(() => {
+    if (!sortField || !sortDirection) return performanceData
+
+    return [...performanceData].sort((a, b) => {
       const aVal = a[sortField]
       const bVal = b[sortField]
 
@@ -34,7 +52,7 @@ export default function ModelPerformancePage() {
 
       return 0
     })
-  }, [sortField, sortDirection])
+  }, [performanceData, sortField, sortDirection])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -77,11 +95,24 @@ export default function ModelPerformancePage() {
         <div className='bg-gradient-to-r from-blue-50 to-blue-100/50 border-b border-blue-100 p-5'>
           <h2 className='text-blue-900 font-semibold'>Model Performance Metrics</h2>
           <p className='text-sm text-slate-600 mt-2'>
-            Click column headers to sort. Click the eye icon to view predicted vs. actual scatter plots.
+            Click column headers to sort.
           </p>
         </div>
 
         <div className='p-5'>
+          {loadError && (
+            <div className='status-banner status-banner-warning mb-4'>
+              <p>{loadError}</p>
+            </div>
+          )}
+
+          {loadingData && (
+            <div className='text-center py-6'>
+              <div className='loading-spinner mx-auto mb-3' />
+              <p className='text-ink-800 text-sm'>Loading model performance...</p>
+            </div>
+          )}
+
           <div className='overflow-x-auto'>
             <Table>
               <TableHeader>
@@ -126,7 +157,6 @@ export default function ModelPerformancePage() {
                       {getSortIcon('mse')}
                     </Button>
                   </TableHead>
-                  <TableHead className='text-blue-900 text-center'>Scatter Plot</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -149,17 +179,6 @@ export default function ModelPerformancePage() {
                     </TableCell>
                     <TableCell className='text-right text-slate-700 font-mono text-sm'>
                       {model.mse.toFixed(2)}
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => setSelectedModel(model)}
-                        className='text-blue-600 hover:text-blue-700 hover:bg-blue-50'
-                        aria-label={`View scatter plot for ${model.behavioralScore}`}
-                      >
-                        <Eye className='w-4 h-4' />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -196,43 +215,6 @@ export default function ModelPerformancePage() {
         <p>Models trained using graph neural networks on functional connectivity data</p>
         <p className='mt-1'>Test set: N=50 subjects, held-out from training</p>
       </div>
-
-      <Dialog open={selectedModel !== null} onOpenChange={() => setSelectedModel(null)}>
-        <DialogContent className='max-w-3xl'>
-          <DialogHeader>
-            <DialogTitle className='text-blue-900'>
-              {selectedModel?.behavioralScore} - Predicted vs. Actual
-            </DialogTitle>
-            <p className='text-sm text-slate-600 mt-2'>Held-out test set performance</p>
-          </DialogHeader>
-
-          {selectedModel && (
-            <div className='mt-4'>
-              <ScatterPlot
-                data={selectedModel.scatterData}
-                title={`${selectedModel.behavioralScore} Prediction`}
-                correlation={selectedModel.correlation}
-              />
-              <div className='mt-4 grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg'>
-                <div>
-                  <p className='text-xs text-slate-500'>Correlation</p>
-                  <p className='text-sm text-slate-900 font-mono'>r = {selectedModel.correlation.toFixed(3)}</p>
-                </div>
-                <div>
-                  <p className='text-xs text-slate-500'>p-value</p>
-                  <p className='text-sm text-slate-900 font-mono'>
-                    {selectedModel.pValue < 0.001 ? '< 0.001' : selectedModel.pValue.toFixed(5)}
-                  </p>
-                </div>
-                <div>
-                  <p className='text-xs text-slate-500'>MSE</p>
-                  <p className='text-sm text-slate-900 font-mono'>{selectedModel.mse.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

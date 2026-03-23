@@ -106,15 +106,6 @@ export interface DashboardStats {
   recent_uploads: RecentUpload[]
 }
 
-// ===== Statistics =====
-export interface MatrixSummary {
-  mean: number
-  median: number
-  min: number
-  max: number
-  positiveRatio: number
-}
-
 // ===== Authentication =====
 export interface User {
   id: string

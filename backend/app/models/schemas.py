@@ -96,6 +96,22 @@ class ExecutionStatus(BaseModel):
     results: Optional[Dict[str, Any]] = None
 
 
+class ScatterPoint(BaseModel):
+    """Predicted vs actual score point for model scatter plot."""
+    actual: float
+    predicted: float
+
+
+class ModelPerformanceItem(BaseModel):
+    """Model performance metrics for a behavioral score."""
+    id: str
+    behavioralScore: str
+    correlation: float
+    pValue: float
+    mse: float
+    scatterData: List[ScatterPoint]
+
+
 class SignupRequest(BaseModel):
     """Schema for user signup."""
     email: str

@@ -291,9 +291,6 @@ export default function HistoryPage() {
                             <Link href={`/analysis/${item.execution_id}`} className='btn-primary'>
                               Open analysis output
                             </Link>
-                            <Link href={`/statistics?executionId=${item.execution_id}`} className='btn-secondary'>
-                              View statistics
-                            </Link>
                           </div>
                         </div>
                       ) : (

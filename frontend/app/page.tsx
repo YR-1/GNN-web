@@ -92,36 +92,6 @@ export default function RootPage() {
               Provides visual representations of functional connectivity networks and model outputs, facilitating interpretation of brain network structure and predicted behavioral outcomes.
             </p>
           </Card>
-
-          <Card className='p-6 hover:shadow-lg transition-shadow'>
-            <div className='w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4'>
-              <Zap className='w-6 h-6 text-blue-600' />
-            </div>
-            <h3 className='text-base font-display font-semibold text-ink-950 mb-2'>Efficient Data Processing</h3>
-            <p className='text-ink-700 text-sm'>
-              Processes high-dimensional brain connectivity data using optimized machine learning pipelines for efficient analysis and prediction.
-            </p>
-          </Card>
-
-          <Card className='p-6 hover:shadow-lg transition-shadow'>
-            <div className='w-12 h-12 bg-pink-500/10 rounded-lg flex items-center justify-center mb-4'>
-              <TestTubeDiagonal className='w-6 h-6 text-pink-600' />
-            </div>
-            <h3 className='text-base font-display font-semibold text-ink-950 mb-2'>Research-Focused Design</h3>
-            <p className='text-ink-700 text-sm'>
-              Built specifically for neuroscience and brain-behavior research, supporting analysis workflows commonly used in functional connectivity studies.
-            </p>
-          </Card>
-
-          <Card className='p-6 hover:shadow-lg transition-shadow'>
-            <div className='w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center mb-4'>
-              <Users className='w-6 h-6 text-cyan-600' />
-            </div>
-            <h3 className='text-base font-display font-semibold text-ink-950 mb-2'>Collaborative</h3>
-            <p className='text-ink-700 text-sm'>
-              Share results with your research team and collaborate on analysis pipelines.
-            </p>
-          </Card>
         </div>
       </section>
 
@@ -165,20 +135,20 @@ export default function RootPage() {
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto'>
           {[
             {
-              title: 'Motor Control Studies',
-              desc: 'Identify brain regions responsible for motor task performance and movement planning',
+              title: 'Functional Brain Network Analysis',
+              desc: 'Examine large-scale interactions between brain regions by modeling functional connectivity as graph-based brain networks.',
             },
             {
-              title: 'Cognitive Tasks',
-              desc: 'Analyze brain activity during memory, attention, and decision-making tasks',
+              title: 'Brain–Behavior Relationship Studies',
+              desc: 'Investigate how patterns of functional connectivity relate to individual differences in cognitive, emotional, and behavioral measures.',
             },
             {
-              title: 'Emotion Processing',
-              desc: 'Study neural correlates of emotional responses and affective states',
+              title: 'Individual Differences Analysis',
+              desc: 'Examine how differences in functional brain connectivity across individuals are associated with variability in behavioral and cognitive measures.',
             },
             {
-              title: 'Clinical Research',
-              desc: 'Investigate biomarkers for neurological and psychiatric conditions',
+              title: 'Objective Behavioral Assessment',
+              desc: 'Provide a data-driven approach to estimating behavioral outcomes from neuroimaging data, complementing traditional questionnaire-based assessments.',
             },
           ].map(({ title, desc }) => (
             <Card key={title} className='p-6'>

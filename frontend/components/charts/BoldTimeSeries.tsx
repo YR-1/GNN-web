@@ -2,61 +2,49 @@
 
 import { useEffect, useRef } from 'react'
 import Plotly from 'plotly.js-dist-min'
-import { getROILabel } from '@/lib/shen268-labels'
-
-/** Simulated BOLD signal for 5 key ROIs. Uses a seeded pseudo-random walk to
- *  produce stable, reproducible traces that resemble fMRI BOLD fluctuations. */
-const BOLD_ROIS = [10, 45, 102, 180, 250] as const
-
-function seededRandom(seed: number) {
-  let s = seed
-  return () => {
-    s = (s * 16807 + 0) % 2147483647
-    return (s - 1) / 2147483646
-  }
-}
-
-function generateBoldSignal(nTimepoints: number, roiIndex: number): number[] {
-  const rand = seededRandom(roiIndex * 137 + 42)
-  const signal: number[] = []
-  let value = 0
-  for (let t = 0; t < nTimepoints; t++) {
-    value += (rand() - 0.5) * 0.6
-    // Add slow drift
-    value += Math.sin(t * 0.04 + roiIndex) * 0.02
-    signal.push(value)
-  }
-  return signal
-}
+import { TimeSeriesPayload } from '@/lib/types'
 
 interface BoldTimeSeriesProps {
-  nTimepoints: number
+  timeSeries?: TimeSeriesPayload
 }
 
-export function BoldTimeSeries({ nTimepoints }: BoldTimeSeriesProps) {
+export function BoldTimeSeries({ timeSeries }: BoldTimeSeriesProps) {
   const plotRef = useRef<HTMLDivElement>(null)
-  const points = Math.max(nTimepoints, 100)
+  const hasData =
+    !!timeSeries &&
+    Array.isArray(timeSeries.tr_index) &&
+    Array.isArray(timeSeries.global_signal) &&
+    timeSeries.tr_index.length > 0 &&
+    timeSeries.global_signal.length > 0 &&
+    timeSeries.tr_index.length === timeSeries.global_signal.length
 
   useEffect(() => {
-    if (!plotRef.current) return
+    if (!plotRef.current || !hasData || !timeSeries) return
 
-    const timeAxis = Array.from({ length: points }, (_, i) => i * 2) // TR = 2s
-
-    const traces = BOLD_ROIS.map((roi) => ({
-      x: timeAxis,
-      y: generateBoldSignal(points, roi),
-      mode: 'lines' as const,
-      name: getROILabel(roi),
-      line: { width: 1.5 },
-    }))
+    const traces = [
+      {
+        x: timeSeries.tr_index,
+        y: timeSeries.global_signal,
+        mode: 'lines' as const,
+        name: 'Global Signal',
+        line: { width: 2.3, color: '#1d4ed8' },
+      },
+      ...timeSeries.roi_series.map((roiSeries) => ({
+        x: timeSeries.tr_index,
+        y: roiSeries.values,
+        mode: 'lines' as const,
+        name: roiSeries.label || `ROI ${roiSeries.roi_index}`,
+        line: { width: 1.4 },
+      })),
+    ]
 
     Plotly.newPlot(
       plotRef.current,
       traces,
       {
-        title: { text: 'Simulated BOLD Signal (5 ROIs)', font: { size: 14, color: '#0f172a' } },
-        xaxis: { title: { text: 'Time (s)', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
-        yaxis: { title: { text: 'BOLD signal (a.u.)', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
+        title: { text: 'Uploaded fMRI Time Series (Global + First 5 ROIs)', font: { size: 14, color: '#0f172a' } },
+        xaxis: { title: { text: 'TR Index', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
+        yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
         legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
         autosize: true,
         margin: { l: 56, r: 20, t: 44, b: 60 },
@@ -69,14 +57,30 @@ export function BoldTimeSeries({ nTimepoints }: BoldTimeSeriesProps) {
     return () => {
       if (plotRef.current) Plotly.purge(plotRef.current)
     }
-  }, [points])
+  }, [hasData, timeSeries])
+
+  if (!hasData) {
+    return (
+      <div className='surface-card space-y-2'>
+        <div>
+          <p className='font-semibold text-ink-950 text-sm'>BOLD Time Series</p>
+          <p className='text-[11px] text-ink-700'>
+            Uploaded file signal preview
+          </p>
+        </div>
+        <div className='status-banner status-banner-error'>
+          <p>Unable to render chart: uploaded time-series is empty or incorrectly formatted.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='surface-card space-y-2'>
       <div>
         <p className='font-semibold text-ink-950 text-sm'>BOLD Time Series</p>
         <p className='text-[11px] text-ink-700'>
-          Simulated fMRI BOLD signal for 5 ROIs over {points} timepoints (TR = 2 s).
+          Real signal from your uploaded file: Global Signal + up to 5 ROI traces.
         </p>
       </div>
       <div

@@ -58,7 +58,7 @@ class AnalysisResponse(BaseModel):
     upload_id: str
     execution_id: str
     status: str
-    results: Optional[Dict[str, Any]] = None
+    results: Optional[Any] = None
     completed_at: Optional[datetime] = None
 
 
@@ -93,7 +93,7 @@ class ExecutionStatus(BaseModel):
     execution_id: str
     status: str
     progress: int
-    results: Optional[Dict[str, Any]] = None
+    results: Optional[Any] = None
 
 
 class ScatterPoint(BaseModel):

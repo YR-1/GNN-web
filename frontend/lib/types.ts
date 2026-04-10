@@ -25,6 +25,20 @@ export interface PredictedScore {
   source?: string
 }
 
+export interface TimeSeriesLine {
+  roi_index: number
+  label: string
+  values: number[]
+}
+
+export interface TimeSeriesPayload {
+  source: string
+  default_view: string
+  tr_index: number[]
+  global_signal: number[]
+  roi_series: TimeSeriesLine[]
+}
+
 // ===== Correlation Results =====
 export interface CorrelationResults {
   n_rois: number
@@ -46,6 +60,7 @@ export interface CorrelationResults {
   predicted_scores?: PredictedScore[]
   prediction_errors?: string[]
   graph_window_count?: number
+  time_series?: TimeSeriesPayload
   error?: string
 }
 
@@ -53,7 +68,7 @@ export interface CorrelationResults {
 export interface AnalysisResponse {
   status: string
   execution_id: string
-  results?: CorrelationResults
+  results?: CorrelationResults & { error?: string }
 }
 
 export type ExecutionStatusValue = 'queued' | 'processing' | 'completed' | 'failed'

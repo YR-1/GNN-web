@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from './supabase'
 import { setAuthToken, removeAuthToken } from './api'
-import { User as BaseUser } from './types'
+import { AnalysisResponse, User as BaseUser } from './types'
 
 interface User extends BaseUser {
   access_token: string
@@ -132,5 +132,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ loading: false })
     }
   },
+}))
+
+interface AnalysisStore {
+  active_analysis: AnalysisResponse | null
+  latest_analysis: AnalysisResponse | null
+  setActiveAnalysis: (analysis: AnalysisResponse | null) => void
+  setLatestAnalysis: (analysis: AnalysisResponse | null) => void
+}
+
+export const useAnalysisStore = create<AnalysisStore>((set) => ({
+  active_analysis: null,
+  latest_analysis: null,
+  setActiveAnalysis: (analysis) => set({ active_analysis: analysis }),
+  setLatestAnalysis: (analysis) => set({ latest_analysis: analysis }),
 }))
 

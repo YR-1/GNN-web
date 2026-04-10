@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
 from tempfile import gettempdir
 import math
@@ -86,6 +86,27 @@ def _parse_json_field(value):
         except json.JSONDecodeError:
             return None
     return value
+
+
+def _make_json_safe(value: Any):
+    """
+    Normalize response payloads so transient non-JSON-safe values
+    (for example NaN/Infinity or numpy scalars) do not break polling endpoints.
+    """
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {str(key): _make_json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_make_json_safe(item) for item in value]
+    if hasattr(value, "item"):
+        try:
+            return _make_json_safe(value.item())
+        except Exception:
+            return str(value)
+    return str(value)
 
 
 @router.post("/upload", response_model=FileUploadResponse)
@@ -186,7 +207,7 @@ async def get_analysis(
     if not row:
         raise HTTPException(status_code=404, detail="Execution not found")
     
-    results = _parse_json_field(row.get("results"))
+    results = _make_json_safe(_parse_json_field(row.get("results")))
     
     return AnalysisResponse(
         upload_id=row["upload_id"],
@@ -214,8 +235,6 @@ async def get_status(
         raise HTTPException(status_code=404, detail="Execution not found")
     
     status = row["status"]
-    results = _parse_json_field(row.get("results"))
-    
     # Calculate progress
     progress = 100 if status == "completed" else (50 if status == "processing" else 0)
     
@@ -223,7 +242,7 @@ async def get_status(
         execution_id=row["execution_id"],
         status=status,
         progress=progress,
-        results=results,
+        results=None,
     )
 
 

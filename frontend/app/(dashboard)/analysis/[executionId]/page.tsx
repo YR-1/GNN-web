@@ -92,9 +92,6 @@ export default function AnalysisResultPage({
           <Link href={`/predictions?executionId=${executionId}`} className='btn-primary'>
             View predictions
           </Link>
-          <Link href={`/statistics?executionId=${executionId}`} className='btn-secondary'>
-            View statistics
-          </Link>
         </div>
       </header>
       <div>

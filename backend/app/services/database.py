@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -16,9 +17,26 @@ class SupabaseDbService:
         if not settings.supabase_url or not key:
             raise RuntimeError("Supabase credentials are not configured for backend DB access.")
         self.client: Client = create_client(settings.supabase_url, key)
+        self._client_lock = threading.RLock()
 
     async def _run(self, fn):
-        return await asyncio.to_thread(fn)
+        def locked_call():
+            # The sync Supabase/PostgREST client is shared process-wide here.
+            # Guard access so background processing and polling requests do not
+            # race each other across worker threads.
+            with self._client_lock:
+                return fn()
+
+        return await asyncio.to_thread(locked_call)
+
+    @staticmethod
+    def _map_execution_status_to_upload_status(status: str) -> str:
+        """
+        `file_uploads.status` has a different allowed set than `model_executions.status`.
+        Preserve queued executions in `model_executions`, but keep uploads at `uploaded`
+        until processing actually begins.
+        """
+        return "uploaded" if status == "queued" else status
 
     async def get_analysis_row(self, execution_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         def op():
@@ -38,7 +56,7 @@ class SupabaseDbService:
         def op():
             result = (
                 self.client.table("model_executions")
-                .select("execution_id,status,results")
+                .select("execution_id,status")
                 .eq("execution_id", execution_id)
                 .eq("user_id", user_id)
                 .limit(1)
@@ -128,7 +146,8 @@ class SupabaseDbService:
                 if lookup_resp.data:
                     upload_id = lookup_resp.data[0].get("upload_id")
             if upload_id:
-                self.client.table("file_uploads").update({"status": status}).eq("upload_id", upload_id).execute()
+                upload_status = self._map_execution_status_to_upload_status(status)
+                self.client.table("file_uploads").update({"status": upload_status}).eq("upload_id", upload_id).execute()
 
         await self._run(op)
 
@@ -165,7 +184,8 @@ class SupabaseDbService:
                 if lookup_resp.data:
                     upload_id = lookup_resp.data[0].get("upload_id")
             if upload_id:
-                self.client.table("file_uploads").update({"status": status}).eq("upload_id", upload_id).execute()
+                upload_status = self._map_execution_status_to_upload_status(status)
+                self.client.table("file_uploads").update({"status": upload_status}).eq("upload_id", upload_id).execute()
 
         await self._run(op)
 

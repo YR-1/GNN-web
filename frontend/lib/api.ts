@@ -52,6 +52,7 @@ export const api = {
   getUploadContent: (uploadId: string, params?: { max_lines?: number; max_chars?: number }) =>
     apiClient.get(`/api/upload/${uploadId}/content`, { params }),
   getDashboardStats: () => apiClient.get('/api/dashboard'),
+  getModelPerformance: () => apiClient.get('/api/model-performance'),
   retryAnalysis: (executionId: string) =>
     apiClient.post(`/api/retry/${executionId}`),
 }

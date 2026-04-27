@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAnalysisStore } from '@/lib/store'
+import { AnalysisResponse } from '@/lib/types'
 
 type ExecutionStatusValue = 'queued' | 'processing' | 'completed' | 'failed'
 
@@ -20,11 +22,15 @@ export default function AnalysisLoadingPage({
 }) {
   const { executionId } = params
   const router = useRouter()
+  const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)
+  const setLatestAnalysis = useAnalysisStore((state) => state.setLatestAnalysis)
   const [displayProgress, setDisplayProgress] = useState(6)
   const [targetProgress, setTargetProgress] = useState(12)
   const [status, setStatus] = useState<ExecutionStatusValue>('queued')
   const [error, setError] = useState('')
   const finishedRef = useRef(false)
+  const consecutiveFailuresRef = useRef(0)
+  const requestInFlightRef = useRef(false)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -41,10 +47,13 @@ export default function AnalysisLoadingPage({
 
   useEffect(() => {
     const pollStatus = async () => {
-      if (finishedRef.current) return
+      if (finishedRef.current || requestInFlightRef.current) return
+      requestInFlightRef.current = true
 
       try {
         const response = await api.getStatus(executionId)
+        consecutiveFailuresRef.current = 0
+        if (error) setError('')
         const nextStatus = response.data.status as ExecutionStatusValue
         setStatus(nextStatus)
         setTargetProgress(targetProgressByStatus[nextStatus] ?? 85)
@@ -52,19 +61,28 @@ export default function AnalysisLoadingPage({
         if (nextStatus === 'completed') {
           finishedRef.current = true
           setTargetProgress(100)
+          const analysisResponse = await api.getAnalysis(executionId)
+          const analysis = analysisResponse.data as AnalysisResponse
+          setLatestAnalysis(analysis)
+          setActiveAnalysis(analysis)
           setTimeout(() => {
-            router.replace(`/analysis/${executionId}`)
+            router.replace('/predictions')
           }, 360)
         } else if (nextStatus === 'failed') {
           finishedRef.current = true
-          setError(response.data.results?.error || 'Analysis failed on server.')
+          setError('Analysis failed on server.')
         }
       } catch (err: any) {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
           router.replace('/login')
           return
         }
-        setError('Failed to fetch analysis status.')
+        consecutiveFailuresRef.current += 1
+        if (consecutiveFailuresRef.current >= 3) {
+          setError('Failed to fetch analysis status.')
+        }
+      } finally {
+        requestInFlightRef.current = false
       }
     }
 
@@ -74,7 +92,7 @@ export default function AnalysisLoadingPage({
     }, 1200)
 
     return () => clearInterval(interval)
-  }, [executionId, router])
+  }, [executionId, error, router, setActiveAnalysis, setLatestAnalysis])
 
   const statusLabel = useMemo(() => {
     if (status === 'queued') return 'Queued'
@@ -110,7 +128,7 @@ export default function AnalysisLoadingPage({
               </div>
             </div>
             <p className='text-sm text-ink-700 mt-4'>
-              We will redirect automatically to the analysis view when complete.
+              We will redirect automatically to the Prediction tab when complete.
             </p>
           </>
         )}

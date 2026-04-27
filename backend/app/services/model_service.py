@@ -325,12 +325,25 @@ def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) 
     """Load and clean one ROI time-series file into [T, ROI] shape."""
     ext = Path(file_path).suffix.lower()
     delimiter = "," if ext == ".csv" else "\t" if ext == ".tsv" else None
-    ts = np.loadtxt(file_path, delimiter=delimiter)
+    try:
+        ts = np.loadtxt(file_path, delimiter=delimiter)
+    except ValueError as exc:
+        raise ValueError(
+            "Unable to parse uploaded file as a numeric matrix. "
+            "Please ensure the file is not empty and contains only numeric values "
+            "separated by spaces/tabs (or commas for CSV)."
+        ) from exc
 
     if ts.ndim == 1:
         ts = ts[:, np.newaxis]
     if ts.ndim != 2:
         raise ValueError(f"Expected 2D time-series array, got shape {ts.shape}")
+
+    if not np.isfinite(ts).all():
+        raise ValueError(
+            "Input contains invalid numeric values (NaN or Infinity). "
+            "Please clean the file and re-upload."
+        )
 
     transposed = False
     if ts.shape[0] == expected_nrois and ts.shape[1] != expected_nrois:
@@ -670,6 +683,20 @@ def _build_results_payload(
         "graph_window_count": graph_windows_count,
         "model_registry_dir": model_registry.get("model_registry_dir"),
         "model_registry": model_registry.get("models"),
+        "time_series": {
+            "source": "uploaded_file",
+            "default_view": "global_plus_first_5_rois",
+            "tr_index": list(range(int(n_timepoints))),
+            "global_signal": np.mean(ts, axis=1).astype(float).tolist(),
+            "roi_series": [
+                {
+                    "roi_index": idx + 1,
+                    "label": _get_roi_label(idx + 1),
+                    "values": ts[:, idx].astype(float).tolist(),
+                }
+                for idx in range(min(5, int(n_rois)))
+            ],
+        },
         "pipeline": {
             "correlation_computed_once": True,
             "reused_for_visualization_and_prediction": True,

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
@@ -8,8 +9,9 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/upload', label: 'Upload Data' },
   { href: '/predictions', label: 'Predictions' },
-  { href: '/statistics', label: 'Statistics' },
   { href: '/history', label: 'History' },
+    { href: '/model-performance', label: 'Model Performance' }, 
+    { href: '/documentation', label: 'Documentation' },
 ]
 
 const isActivePath = (pathname: string, href: string) =>
@@ -55,9 +57,9 @@ export default function DashboardLayout({
       <nav className='top-nav'>
         <div className='top-nav-inner'>
           <div className='top-nav-brand'>
-            <div className='brand-mark'>RA</div>
+            <Image src='/fyp-logo-brain.png' alt='MindPulse' width={50} height={50} className='rounded-lg' />
             <Link href='/dashboard' className='brand-title'>
-              ROI Analyzer
+              MindPulse
             </Link>
           </div>
 

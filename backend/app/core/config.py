@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     model_registry_scores: str = "listsort_ageadj,sleep_quality,emotion_recognition,sustained_attention,pmat"
     
     # CORS
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8000"]
+    allowed_origins: list = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000"]
     
     class Config:
         env_file = ".env"

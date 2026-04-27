@@ -12,7 +12,7 @@ if (!supabaseUrl || !supabasePublicKey) {
 export const supabase = createClient(supabaseUrl, supabasePublicKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: false,
     detectSessionInUrl: true,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },

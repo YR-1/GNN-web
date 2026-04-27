@@ -7,14 +7,49 @@ interface User extends BaseUser {
   access_token: string
 }
 
+const AUTH_SESSION_DURATION_MS = 60 * 60 * 1000
+const AUTH_EXPIRES_AT_KEY = 'auth_expires_at'
+let authExpiryTimer: ReturnType<typeof setTimeout> | null = null
+
 // Helper to set auth cookie for middleware
-function setAuthCookie(token: string) {
-  document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+function setAuthCookie(token: string, maxAgeSeconds = 60 * 60) {
+  document.cookie = `token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`
 }
 
 // Helper to remove auth cookie
 function removeAuthCookie() {
   document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
+
+function setAuthExpiry() {
+  localStorage.setItem(AUTH_EXPIRES_AT_KEY, String(Date.now() + AUTH_SESSION_DURATION_MS))
+}
+
+function clearAuthExpiry() {
+  localStorage.removeItem(AUTH_EXPIRES_AT_KEY)
+}
+
+function clearAuthExpiryTimer() {
+  if (authExpiryTimer) {
+    clearTimeout(authExpiryTimer)
+    authExpiryTimer = null
+  }
+}
+
+function scheduleAuthExpiry(onExpire: () => void, maxAgeSeconds: number) {
+  clearAuthExpiryTimer()
+  if (maxAgeSeconds > 0) {
+    authExpiryTimer = setTimeout(onExpire, maxAgeSeconds * 1000)
+  }
+}
+
+function getRemainingSessionSeconds() {
+  const expiresAt = Number(localStorage.getItem(AUTH_EXPIRES_AT_KEY))
+  if (!Number.isFinite(expiresAt)) {
+    return 0
+  }
+
+  return Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
 }
 
 interface AuthStore {
@@ -27,23 +62,75 @@ interface AuthStore {
   restoreSession: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  // Start in loading state so protected routes wait for session restore on first paint.
-  loading: true,
+export const useAuthStore = create<AuthStore>((set) => {
+  const expireSession = async () => {
+    await supabase.auth.signOut()
+    removeAuthToken()
+    removeAuthCookie()
+    clearAuthExpiry()
+    clearAuthExpiryTimer()
+    set({ user: null })
+  }
 
-  signup: async (email: string, password: string) => {
-    set({ loading: true })
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-      if (error) throw error
-      const token = data.session?.access_token
-      if (token) {
+  const scheduleLogout = (maxAgeSeconds = 60 * 60) => {
+    scheduleAuthExpiry(() => {
+      void expireSession()
+    }, maxAgeSeconds)
+  }
+
+  return {
+    user: null,
+    // Start in loading state so protected routes wait for session restore on first paint.
+    loading: true,
+
+    signup: async (email: string, password: string) => {
+      set({ loading: true })
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        })
+        if (error) throw error
+        const token = data.session?.access_token
+        if (token) {
+          setAuthExpiry()
+          setAuthToken(token)
+          setAuthCookie(token)
+          scheduleLogout()
+          set({
+            user: {
+              id: data.user?.id || '',
+              email,
+              access_token: token,
+            },
+          })
+          return true
+        }
+
+        removeAuthToken()
+        removeAuthCookie()
+        clearAuthExpiry()
+        clearAuthExpiryTimer()
+        set({ user: null })
+        return false
+      } finally {
+        set({ loading: false })
+      }
+    },
+
+    login: async (email: string, password: string) => {
+      set({ loading: true })
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (error) throw error
+        const token = data.session?.access_token || ''
+        setAuthExpiry()
         setAuthToken(token)
         setAuthCookie(token)
+        scheduleLogout()
         set({
           user: {
             id: data.user?.id || '',
@@ -51,88 +138,65 @@ export const useAuthStore = create<AuthStore>((set) => ({
             access_token: token,
           },
         })
-        return true
+      } finally {
+        set({ loading: false })
       }
+    },
 
-      removeAuthToken()
-      removeAuthCookie()
-      set({ user: null })
-      return false
-    } finally {
-      set({ loading: false })
-    }
-  },
+    logout: expireSession,
 
-  login: async (email: string, password: string) => {
-    set({ loading: true })
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) throw error
-      const token = data.session?.access_token || ''
-      setAuthToken(token)
-      setAuthCookie(token)
-      set({
-        user: {
-          id: data.user?.id || '',
-          email,
-          access_token: token,
-        },
-      })
-    } finally {
-      set({ loading: false })
-    }
-  },
+    setUser: (user) => set({ user }),
 
-  logout: async () => {
-    await supabase.auth.signOut()
-    removeAuthToken()
-    removeAuthCookie()
-    set({ user: null })
-  },
+    restoreSession: async () => {
+      set({ loading: true })
+      try {
+        const { data, error } = await supabase.auth.getSession()
 
-  setUser: (user) => set({ user }),
+        if (error) {
+          console.error('Session restore error:', error)
+          throw error
+        }
 
-  restoreSession: async () => {
-    set({ loading: true })
-    try {
-      const { data, error } = await supabase.auth.getSession()
+        if (data.session?.user) {
+          const remainingSessionSeconds = getRemainingSessionSeconds()
+          if (remainingSessionSeconds <= 0) {
+            await expireSession()
+            return
+          }
 
-      if (error) {
-        console.error('Session restore error:', error)
-        throw error
-      }
-
-      if (data.session?.user) {
-        console.log('Session restored for user:', data.session.user.email)
-        const token = data.session.access_token
-        setAuthToken(token)
-        setAuthCookie(token)
-        set({
-          user: {
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            access_token: token,
-          },
-        })
-      } else {
-        console.log('No session found')
+          console.log('Session restored for user:', data.session.user.email)
+          const token = data.session.access_token
+          setAuthToken(token)
+          setAuthCookie(token, remainingSessionSeconds)
+          scheduleLogout(remainingSessionSeconds)
+          set({
+            user: {
+              id: data.session.user.id,
+              email: data.session.user.email || '',
+              access_token: token,
+            },
+          })
+        } else {
+          console.log('No session found')
+          removeAuthToken()
+          removeAuthCookie()
+          clearAuthExpiry()
+          clearAuthExpiryTimer()
+          set({ user: null })
+        }
+      } catch (error) {
+        console.error('Failed to restore session:', error)
         removeAuthToken()
         removeAuthCookie()
+        clearAuthExpiry()
+        clearAuthExpiryTimer()
         set({ user: null })
+      } finally {
+        set({ loading: false })
       }
-    } catch (error) {
-      console.error('Failed to restore session:', error)
-      removeAuthToken()
-      removeAuthCookie()
-      set({ user: null })
-    } finally {
-      set({ loading: false })
-    }
-  },
-}))
+    },
+  }
+})
 
 interface AnalysisStore {
   active_analysis: AnalysisResponse | null

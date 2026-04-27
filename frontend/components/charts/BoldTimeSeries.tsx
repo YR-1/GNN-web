@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import Plotly from 'plotly.js-dist-min'
 import { TimeSeriesPayload } from '@/lib/types'
 
 interface BoldTimeSeriesProps {
@@ -10,6 +9,7 @@ interface BoldTimeSeriesProps {
 
 export function BoldTimeSeries({ timeSeries }: BoldTimeSeriesProps) {
   const plotRef = useRef<HTMLDivElement>(null)
+  const plotlyRef = useRef<any>(null)
   const hasData =
     !!timeSeries &&
     Array.isArray(timeSeries.tr_index) &&
@@ -21,41 +21,53 @@ export function BoldTimeSeries({ timeSeries }: BoldTimeSeriesProps) {
   useEffect(() => {
     if (!plotRef.current || !hasData || !timeSeries) return
 
-    const traces = [
-      {
-        x: timeSeries.tr_index,
-        y: timeSeries.global_signal,
-        mode: 'lines' as const,
-        name: 'Global Signal',
-        line: { width: 2.3, color: '#1d4ed8' },
-      },
-      ...timeSeries.roi_series.map((roiSeries) => ({
-        x: timeSeries.tr_index,
-        y: roiSeries.values,
-        mode: 'lines' as const,
-        name: roiSeries.label || `ROI ${roiSeries.roi_index}`,
-        line: { width: 1.4 },
-      })),
-    ]
+    let cancelled = false
 
-    Plotly.newPlot(
-      plotRef.current,
-      traces,
-      {
-        title: { text: 'Uploaded fMRI Time Series (Global + First 5 ROIs)', font: { size: 14, color: '#0f172a' } },
-        xaxis: { title: { text: 'TR Index', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
-        yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
-        legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
-        autosize: true,
-        margin: { l: 56, r: 20, t: 44, b: 60 },
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-      },
-      { responsive: true, displayModeBar: true, displaylogo: false }
-    ).catch((err: unknown) => console.error('BOLD plot error:', err))
+    const renderPlot = async () => {
+      const { default: Plotly } = await import('plotly.js-dist-min')
+      if (cancelled || !plotRef.current) return
+
+      plotlyRef.current = Plotly
+
+      const traces = [
+        {
+          x: timeSeries.tr_index,
+          y: timeSeries.global_signal,
+          mode: 'lines' as const,
+          name: 'Global Signal',
+          line: { width: 2.3, color: '#1d4ed8' },
+        },
+        ...timeSeries.roi_series.map((roiSeries) => ({
+          x: timeSeries.tr_index,
+          y: roiSeries.values,
+          mode: 'lines' as const,
+          name: roiSeries.label || `ROI ${roiSeries.roi_index}`,
+          line: { width: 1.4 },
+        })),
+      ]
+
+      Plotly.newPlot(
+        plotRef.current,
+        traces,
+        {
+          title: { text: 'Uploaded fMRI Time Series (Global + First 5 ROIs)', font: { size: 14, color: '#0f172a' } },
+          xaxis: { title: { text: 'TR Index', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
+          yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
+          legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
+          autosize: true,
+          margin: { l: 56, r: 20, t: 44, b: 60 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+        },
+        { responsive: true, displayModeBar: true, displaylogo: false }
+      ).catch((err: unknown) => console.error('BOLD plot error:', err))
+    }
+
+    void renderPlot()
 
     return () => {
-      if (plotRef.current) Plotly.purge(plotRef.current)
+      cancelled = true
+      if (plotRef.current) plotlyRef.current?.purge(plotRef.current)
     }
   }, [hasData, timeSeries])
 

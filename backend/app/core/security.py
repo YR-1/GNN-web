@@ -45,6 +45,12 @@ async def verify_token(authorization: Optional[str] = Header(None)) -> Dict[str,
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
     settings = get_settings()
+    missing = settings.missing_auth_fields()
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"JWT signing is not configured. Missing: {', '.join(missing)}",
+        )
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

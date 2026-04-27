@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import Plotly from 'plotly.js-dist-min'
 import { CorrelationResults } from '@/lib/types'
 
 interface CorrelationMatrixProps {
@@ -11,6 +10,7 @@ interface CorrelationMatrixProps {
 
 export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixProps) {
   const plotRef = useRef<HTMLDivElement>(null)
+  const plotlyRef = useRef<any>(null)
   const downloadButtonStyle = {
     backgroundColor: '#949bad',
     borderColor: '#949bad',
@@ -20,54 +20,66 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   useEffect(() => {
     if (!plotRef.current || !data.plotly_json) return
 
-    const baseLayout = (data.plotly_json.layout ?? {}) as Record<string, unknown>
-    const baseXaxis = ((baseLayout.xaxis as Record<string, unknown> | undefined) ?? {})
-    const baseYaxis = ((baseLayout.yaxis as Record<string, unknown> | undefined) ?? {})
-    const layout = {
-      ...baseLayout,
-      autosize: true,
-      dragmode: 'zoom',
-      uirevision: 'correlation-matrix',
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      margin: { l: 40, r: 20, t: 48, b: 40 },
-      xaxis: {
-        ...baseXaxis,
-        fixedrange: false,
-      },
-      yaxis: {
-        ...baseYaxis,
-        fixedrange: false,
-      },
+    let cancelled = false
+
+    const renderPlot = async () => {
+      const { default: Plotly } = await import('plotly.js-dist-min')
+      if (cancelled || !plotRef.current) return
+
+      plotlyRef.current = Plotly
+
+      const baseLayout = (data.plotly_json.layout ?? {}) as Record<string, unknown>
+      const baseXaxis = ((baseLayout.xaxis as Record<string, unknown> | undefined) ?? {})
+      const baseYaxis = ((baseLayout.yaxis as Record<string, unknown> | undefined) ?? {})
+      const layout = {
+        ...baseLayout,
+        autosize: true,
+        dragmode: 'zoom',
+        uirevision: 'correlation-matrix',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        margin: { l: 40, r: 20, t: 48, b: 40 },
+        xaxis: {
+          ...baseXaxis,
+          fixedrange: false,
+        },
+        yaxis: {
+          ...baseYaxis,
+          fixedrange: false,
+        },
+      }
+
+      Plotly.newPlot(plotRef.current, data.plotly_json.data ?? [], layout, {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        scrollZoom: true,
+        modeBarButtonsToAdd: [
+          'zoom2d',
+          'pan2d',
+          'select2d',
+          'lasso2d',
+          'zoomIn2d',
+          'zoomOut2d',
+          'autoScale2d',
+          'resetScale2d',
+        ],
+        modeBarButtonsToRemove: ['sendDataToCloud', 'toggleSpikelines', 'hoverCompareCartesian'],
+        toImageButtonOptions: {
+          filename: `correlation_matrix_${Date.now()}`,
+          format: 'png',
+        },
+      }).catch((error: unknown) => {
+        console.error('Error rendering Plotly chart:', error)
+      })
     }
 
-    Plotly.newPlot(plotRef.current, data.plotly_json.data ?? [], layout, {
-      responsive: true,
-      displayModeBar: true,
-      displaylogo: false,
-      scrollZoom: true,
-      modeBarButtonsToAdd: [
-        'zoom2d',
-        'pan2d',
-        'select2d',
-        'lasso2d',
-        'zoomIn2d',
-        'zoomOut2d',
-        'autoScale2d',
-        'resetScale2d',
-      ],
-      modeBarButtonsToRemove: ['sendDataToCloud', 'toggleSpikelines', 'hoverCompareCartesian'],
-      toImageButtonOptions: {
-        filename: `correlation_matrix_${Date.now()}`,
-        format: 'png',
-      },
-    }).catch((error: unknown) => {
-      console.error('Error rendering Plotly chart:', error)
-    })
+    void renderPlot()
 
     return () => {
+      cancelled = true
       if (plotRef.current) {
-        Plotly.purge(plotRef.current)
+        plotlyRef.current?.purge(plotRef.current)
       }
     }
   }, [data])
@@ -97,15 +109,15 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   }
 
   const setDragMode = (mode: 'zoom' | 'pan' | 'select' | 'lasso') => {
-    if (!plotRef.current) return
-    Plotly.relayout(plotRef.current, { dragmode: mode }).catch((error: unknown) => {
+    if (!plotRef.current || !plotlyRef.current) return
+    plotlyRef.current.relayout(plotRef.current, { dragmode: mode }).catch((error: unknown) => {
       console.error('Error switching drag mode:', error)
     })
   }
 
   const resetView = () => {
-    if (!plotRef.current) return
-    Plotly.relayout(plotRef.current, {
+    if (!plotRef.current || !plotlyRef.current) return
+    plotlyRef.current.relayout(plotRef.current, {
       'xaxis.autorange': true,
       'yaxis.autorange': true,
       dragmode: 'zoom',
@@ -115,7 +127,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   }
 
   const zoomBy = (factor: number) => {
-    if (!plotRef.current) return
+    if (!plotRef.current || !plotlyRef.current) return
     const plotEl = plotRef.current as unknown as {
       layout?: { xaxis?: { range?: [number, number] }; yaxis?: { range?: [number, number] } }
     }
@@ -131,7 +143,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
     const xHalfSpan = ((xRange[1] - xRange[0]) * factor) / 2
     const yHalfSpan = ((yRange[1] - yRange[0]) * factor) / 2
 
-    Plotly.relayout(plotRef.current, {
+    plotlyRef.current.relayout(plotRef.current, {
       'xaxis.range': [xCenter - xHalfSpan, xCenter + xHalfSpan],
       'yaxis.range': [yCenter - yHalfSpan, yCenter + yHalfSpan],
     }).catch((error: unknown) => {
@@ -140,8 +152,8 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   }
 
   const downloadAsPNG = () => {
-    if (!plotRef.current) return
-    Plotly.downloadImage(plotRef.current, {
+    if (!plotRef.current || !plotlyRef.current) return
+    plotlyRef.current.downloadImage(plotRef.current, {
       format: 'png',
       filename: `correlation_matrix_${Date.now()}`,
     }).catch((error: unknown) => {

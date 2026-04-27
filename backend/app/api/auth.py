@@ -3,13 +3,19 @@ from ..models.schemas import SignupRequest, LoginRequest, AuthResponse
 from ..core.security import create_access_token, verify_token
 from ..core.config import get_settings
 from supabase import create_client
-import uuid
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Initialize Supabase client
-settings = get_settings()
-supabase = create_client(settings.supabase_url, settings.supabase_key)
+
+def _get_supabase_client():
+    settings = get_settings()
+    missing = settings.missing_supabase_fields()
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Authentication service is not configured. Missing: {', '.join(missing)}",
+        )
+    return create_client(settings.supabase_url, settings.supabase_key)
 
 
 @router.post("/signup", response_model=AuthResponse)
@@ -21,6 +27,7 @@ async def signup(request: SignupRequest) -> AuthResponse:
         raise HTTPException(status_code=400, detail="Invalid email")
     
     try:
+        supabase = _get_supabase_client()
         # Sign up with Supabase Auth
         response = supabase.auth.sign_up({
             "email": request.email,
@@ -60,6 +67,7 @@ async def login(request: LoginRequest) -> AuthResponse:
     User login with email/password using Supabase Auth.
     """
     try:
+        supabase = _get_supabase_client()
         # Sign in with Supabase Auth
         response = supabase.auth.sign_in_with_password({
             "email": request.email,

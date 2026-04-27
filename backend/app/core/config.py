@@ -1,20 +1,21 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Supabase
-    supabase_url: str
-    supabase_key: str
+    supabase_url: str = ""
+    supabase_key: str = ""
     supabase_service_role_key: str = ""
     
     # Legacy direct database URL (optional; kept for backward compatibility)
     database_url: str = ""
     
     # JWT
-    jwt_secret: str
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     
@@ -34,6 +35,26 @@ class Settings(BaseSettings):
     
     # CORS
     allowed_origins: list = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000"]
+
+    def missing_supabase_fields(self) -> list[str]:
+        missing = []
+        if not self.supabase_url:
+            missing.append("SUPABASE_URL")
+        if not self.supabase_key:
+            missing.append("SUPABASE_KEY")
+        return missing
+
+    def missing_auth_fields(self) -> list[str]:
+        missing = []
+        if not self.jwt_secret:
+            missing.append("JWT_SECRET")
+        return missing
+
+    def supabase_enabled(self) -> bool:
+        return not self.missing_supabase_fields()
+
+    def jwt_enabled(self) -> bool:
+        return not self.missing_auth_fields()
     
     class Config:
         env_file = ".env"

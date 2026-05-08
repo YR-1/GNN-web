@@ -2,8 +2,9 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { BackButton } from '@/components/BackButton'
 import { useAuthStore } from '@/lib/store'
 
 const formatLoginError = (rawMessage: string) => {
@@ -33,13 +34,15 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login, user, loading: authLoading } = useAuthStore()
+  const redirectTo = searchParams.get('from') || '/dashboard'
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/dashboard')
+      router.replace(redirectTo)
     }
-  }, [authLoading, user, router])
+  }, [authLoading, user, router, redirectTo])
 
   const isSubmitDisabled = submitting || authLoading || !email.trim() || password.length === 0
 
@@ -52,7 +55,7 @@ export default function LoginPage() {
 
     try {
       await login(email.trim(), password)
-      router.replace('/dashboard')
+      router.replace(redirectTo)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'
       setError(formatLoginError(message))
@@ -143,9 +146,13 @@ export default function LoginPage() {
 
             <div className='mt-6 rounded-xl border border-brand-400/25 bg-white/70 p-4 text-sm text-ink-700'>
               Need an account?{' '}
-              <Link href='/signup' className='font-semibold text-brand-700 hover:text-brand-600'>
+              <Link href={`/signup?from=${encodeURIComponent(redirectTo)}`} className='font-semibold text-brand-700 hover:text-brand-600'>
                 Create one
               </Link>
+            </div>
+
+            <div className='mt-6'>
+              <BackButton fallbackHref={redirectTo} className='w-full' />
             </div>
           </div>
         </div>

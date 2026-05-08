@@ -2,8 +2,9 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { BackButton } from '@/components/BackButton'
 import { useAuthStore } from '@/lib/store'
 
 export default function SignupPage() {
@@ -13,7 +14,9 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signup } = useAuthStore()
+  const redirectTo = searchParams.get('from') || '/dashboard'
 
   const handleSignup = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -23,7 +26,7 @@ export default function SignupPage() {
     try {
       const hasSession = await signup(email, password)
       if (hasSession) {
-        router.push('/dashboard')
+        router.push(redirectTo)
         return
       }
       setConfirmed(true)
@@ -51,9 +54,12 @@ export default function SignupPage() {
                 <p className='section-subtitle text-center mt-2'>
                   Verify your email, then sign in to continue.
                 </p>
-                <button type='button' className='btn-primary w-full mt-6' onClick={() => router.push('/login')}>
+                <button type='button' className='btn-primary w-full mt-6' onClick={() => router.push(`/login?from=${encodeURIComponent(redirectTo)}`)}>
                   Go to Sign In
                 </button>
+                <div className='mt-6'>
+                  <BackButton fallbackHref={redirectTo} className='w-full' />
+                </div>
               </>
             ) : (
               <>
@@ -108,9 +114,13 @@ export default function SignupPage() {
 
                 <div className='mt-6 rounded-xl border border-brand-400/25 bg-white/70 p-4 text-sm text-ink-700'>
                   Already registered?{' '}
-                  <Link href='/login' className='font-semibold text-brand-700 hover:text-brand-600'>
+                  <Link href={`/login?from=${encodeURIComponent(redirectTo)}`} className='font-semibold text-brand-700 hover:text-brand-600'>
                     Sign in
                   </Link>
+                </div>
+
+                <div className='mt-6'>
+                  <BackButton fallbackHref={redirectTo} className='w-full' />
                 </div>
               </>
             )}

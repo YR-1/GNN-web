@@ -19,10 +19,33 @@ const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix')
   ),
 })
 
+const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
+
 interface PredictionReportProps {
   analysis: AnalysisResponse
   heading?: string
   executionIdLabel?: boolean
+}
+
+function normalizeScoreId(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+
+function toCanonicalScoreId(value: string): string {
+  const alias: Record<string, string> = {
+    emotion_score: 'emotion_recognition',
+    emotion: 'emotion_recognition',
+    attention: 'sustained_attention',
+    wm: 'listsort_ageadj',
+    working_memory: 'listsort_ageadj',
+    listsort: 'listsort_ageadj',
+    list_sort: 'listsort_ageadj',
+    listsort_age_adj: 'listsort_ageadj',
+    list_sort_age_adj: 'listsort_ageadj',
+  }
+
+  const normalizedId = normalizeScoreId(value)
+  return alias[normalizedId] ?? normalizedId
 }
 
 export function PredictionReport({
@@ -30,7 +53,7 @@ export function PredictionReport({
   heading = 'Prediction Report',
   executionIdLabel = true,
 }: PredictionReportProps) {
-  const [selectedScoreId, setSelectedScoreId] = useState<string | null>(SCORE_REGISTRY[0]?.id ?? null)
+  const [selectedScoreId, setSelectedScoreId] = useState<string | null>(PRIMARY_VISUAL_SCORE_ID)
 
   const results = analysis.results as CorrelationResults | undefined
 
@@ -38,15 +61,10 @@ export function PredictionReport({
     const byId: Record<string, SimulatedScoreResult> = {}
     const predictions = results?.predicted_scores ?? []
 
-    const normalizeScoreId = (value: string) =>
-      value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-
-    const alias: Record<string, string> = { emotion_score: 'emotion_recognition' }
-
     for (const prediction of predictions) {
       const rawId = prediction.score_id
       if (!rawId) continue
-      const normalizedId = alias[normalizeScoreId(rawId)] ?? normalizeScoreId(rawId)
+      const normalizedId = toCanonicalScoreId(rawId)
       const value = Number(prediction.value)
       if (!Number.isFinite(value)) continue
 
@@ -62,16 +80,36 @@ export function PredictionReport({
   const predictedValues = useMemo(() => {
     if (!results?.correlation_matrix) return {}
     const values: Record<string, SimulatedScoreResult> = {}
+
+    const hasBackendModel = (scoreId: string) => {
+      const entry = Object.entries(results.model_registry ?? {}).find(
+        ([registryScoreId]) => toCanonicalScoreId(registryScoreId) === scoreId
+      )?.[1]
+      return Boolean(entry?.exists)
+    }
+
     for (const score of SCORE_REGISTRY) {
-      values[score.id] =
-        modelPredictions[score.id] ??
-        simulateScore(score, results.correlation_matrix)
+      if (modelPredictions[score.id]) {
+        values[score.id] = modelPredictions[score.id]
+        continue
+      }
+
+      // If a real backend model exists for this score, do not mask missing
+      // inference results with a simulated placeholder.
+      if (hasBackendModel(score.id)) {
+        continue
+      }
+
+      values[score.id] = simulateScore(score, results.correlation_matrix)
     }
     return values
-  }, [results?.correlation_matrix, modelPredictions])
+  }, [results?.correlation_matrix, results?.model_registry, modelPredictions])
 
   const selectedScore = useMemo(
-    () => SCORE_REGISTRY.find((s) => s.id === selectedScoreId) ?? null,
+    () =>
+      SCORE_REGISTRY.find((s) => s.id === selectedScoreId) ??
+      SCORE_REGISTRY.find((s) => s.id === PRIMARY_VISUAL_SCORE_ID) ??
+      null,
     [selectedScoreId]
   )
 
@@ -97,6 +135,9 @@ export function PredictionReport({
         <h2 className='section-title'>{heading}</h2>
         <p className='section-subtitle'>
           File: <span className='mono-data'>{results.file_name}</span>
+        </p>
+        <p className='section-subtitle'>
+          Visual model link: <span className='font-semibold text-ink-950'>ListSort (Age Adjusted)</span>
         </p>
         {executionIdLabel && (
           <p className='section-subtitle'>

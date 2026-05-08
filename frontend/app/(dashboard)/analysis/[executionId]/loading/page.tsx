@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAnalysisStore } from '@/lib/store'
@@ -15,6 +15,13 @@ const targetProgressByStatus: Record<ExecutionStatusValue, number> = {
   failed: 100,
 }
 
+const fallbackStatusMessage: Record<ExecutionStatusValue, string> = {
+  queued: 'Waiting for the analysis job to start on the server.',
+  processing: 'Computing connectivity, generating outputs, and preparing predictions.',
+  completed: 'Analysis finished. Preparing to open the results.',
+  failed: 'The analysis stopped before completion.',
+}
+
 export default function AnalysisLoadingPage({
   params,
 }: {
@@ -22,12 +29,15 @@ export default function AnalysisLoadingPage({
 }) {
   const { executionId } = params
   const router = useRouter()
+  const searchParams = useSearchParams()
   const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)
   const setLatestAnalysis = useAnalysisStore((state) => state.setLatestAnalysis)
   const [displayProgress, setDisplayProgress] = useState(6)
   const [targetProgress, setTargetProgress] = useState(12)
   const [status, setStatus] = useState<ExecutionStatusValue>('queued')
   const [error, setError] = useState('')
+  const [fileName, setFileName] = useState(searchParams.get('fileName') ?? '')
+  const [statusMessage, setStatusMessage] = useState(fallbackStatusMessage.queued)
   const finishedRef = useRef(false)
   const consecutiveFailuresRef = useRef(0)
   const requestInFlightRef = useRef(false)
@@ -46,6 +56,33 @@ export default function AnalysisLoadingPage({
   }, [targetProgress])
 
   useEffect(() => {
+    const queryFileName = searchParams.get('fileName')
+    if (queryFileName) {
+      setFileName(queryFileName)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (fileName) return
+
+    const fetchFileName = async () => {
+      try {
+        const response = await api.getHistory()
+        const match = (response.data as Array<{ execution_id?: string; file_name: string }>).find(
+          (item) => item.execution_id === executionId
+        )
+        if (match?.file_name) {
+          setFileName(match.file_name)
+        }
+      } catch {
+        // Non-blocking enhancement only; loading should continue even if history lookup fails.
+      }
+    }
+
+    void fetchFileName()
+  }, [executionId, fileName])
+
+  useEffect(() => {
     const pollStatus = async () => {
       if (finishedRef.current || requestInFlightRef.current) return
       requestInFlightRef.current = true
@@ -57,6 +94,7 @@ export default function AnalysisLoadingPage({
         const nextStatus = response.data.status as ExecutionStatusValue
         setStatus(nextStatus)
         setTargetProgress(targetProgressByStatus[nextStatus] ?? 85)
+        setStatusMessage(response.data.message?.trim() || fallbackStatusMessage[nextStatus] || fallbackStatusMessage.processing)
 
         if (nextStatus === 'completed') {
           finishedRef.current = true
@@ -105,6 +143,11 @@ export default function AnalysisLoadingPage({
     <section className='max-w-2xl mx-auto min-h-[64vh] flex items-center justify-center'>
       <div className='page-container w-full'>
         <h1 className='section-title text-3xl'>Analyzing Your File</h1>
+        {fileName ? (
+          <p className='section-subtitle mt-2'>
+            Loading: <span className='mono-data'>{fileName}</span>
+          </p>
+        ) : null}
         <p className='section-subtitle mt-2'>
           Execution ID: <span className='mono-data'>{executionId}</span>
         </p>
@@ -127,6 +170,9 @@ export default function AnalysisLoadingPage({
                 />
               </div>
             </div>
+            <p className='text-sm text-ink-800 mt-4'>
+              {statusMessage}
+            </p>
             <p className='text-sm text-ink-700 mt-4'>
               We will redirect automatically to the Prediction tab when complete.
             </p>

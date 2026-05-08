@@ -1,9 +1,11 @@
 import asyncio
 import base64
+import copy
 import io
 import json
 import numpy as np
 import sys
+import warnings
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from .database import save_execution_results, set_execution_status
@@ -319,6 +321,8 @@ def create_nilearn_markers_payload(
 EXPECTED_NROIS = 268
 DEFAULT_WSIZE = 20
 DEFAULT_SHIFT = 10
+DEFAULT_XAI_TOP_K_EDGES = 10
+DEFAULT_XAI_TOP_K_WINDOWS = 3
 
 
 def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -429,7 +433,98 @@ def _convert_timeseries_to_graph_windows(
     }
 
 
-def _resolve_inference_model(loaded_obj: Any):
+def _import_gatv2_model_classes():
+    """Import local training-time GATv2 model classes for checkpoint reconstruction."""
+    project_root = Path(__file__).resolve().parents[4]
+    training_dir = project_root / "GNN-mri" / "training" / "gatv2"
+    if not training_dir.exists():
+        raise FileNotFoundError(f"GATv2 training module path not found: {training_dir}")
+
+    if str(training_dir) not in sys.path:
+        sys.path.insert(0, str(training_dir))
+
+    improved_cls = None
+    basic_cls = None
+
+    try:
+        from train_gatv2_improved import ImprovedGATv2Regressor  # type: ignore
+        improved_cls = ImprovedGATv2Regressor
+    except Exception:
+        improved_cls = None
+
+    try:
+        from train_gatv2_basic import GATv2Regressor  # type: ignore
+        basic_cls = GATv2Regressor
+    except Exception:
+        basic_cls = None
+
+    return improved_cls, basic_cls
+
+
+def _infer_input_dim_from_checkpoint(state_dict: Dict[str, Any], sample_graph: Any | None = None) -> int:
+    """Infer node feature dimension from a graph sample or checkpoint weights."""
+    if sample_graph is not None and hasattr(sample_graph, "x") and sample_graph.x is not None:
+        return int(sample_graph.x.shape[-1])
+
+    for key in ("input_proj.weight", "gat1.lin_l.weight", "gat1.lin_r.weight"):
+        weight = state_dict.get(key)
+        if weight is not None and hasattr(weight, "shape") and len(weight.shape) >= 2:
+            return int(weight.shape[1])
+
+    raise ValueError("Unable to infer model input dimension from checkpoint.")
+
+
+def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any | None = None):
+    """Reconstruct supported GATv2 architectures from checkpoint dictionaries."""
+    state_dict = loaded_obj.get("model_state_dict") or loaded_obj.get("state_dict") or loaded_obj
+    if not isinstance(state_dict, dict):
+        raise ValueError("Checkpoint does not contain a valid state_dict payload.")
+
+    config = loaded_obj.get("config", {}) if isinstance(loaded_obj.get("config", {}), dict) else {}
+    in_dim = _infer_input_dim_from_checkpoint(state_dict, sample_graph)
+    improved_cls, basic_cls = _import_gatv2_model_classes()
+
+    build_errors: List[str] = []
+
+    if improved_cls is not None:
+        try:
+            model = improved_cls(
+                in_dim=in_dim,
+                hidden_dim=int(config.get("hidden_dim", 64)),
+                n_layers=int(config.get("n_layers", 3)),
+                n_heads=int(config.get("n_heads", 4)),
+                dropout=float(config.get("dropout", 0.2)),
+                edge_dropout=float(config.get("edge_dropout", 0.1)),
+                out_dim=1,
+                use_global_attention_pool=bool(config.get("use_global_attention_pool", True)),
+            )
+            model.load_state_dict(state_dict)
+            model.eval()
+            return model
+        except Exception as exc:
+            build_errors.append(f"ImprovedGATv2Regressor: {exc}")
+
+    if basic_cls is not None:
+        try:
+            model = basic_cls(
+                in_dim=in_dim,
+                hidden_dim=int(config.get("hidden_dim", 32)),
+                out_dim=1,
+                use_global_attention_pool=bool(config.get("use_global_attention_pool", True)),
+            )
+            model.load_state_dict(state_dict)
+            model.eval()
+            return model
+        except Exception as exc:
+            build_errors.append(f"GATv2Regressor: {exc}")
+
+    raise ValueError(
+        "Model checkpoint contains a state_dict but backend could not reconstruct a supported model class. "
+        + " | ".join(build_errors)
+    )
+
+
+def _resolve_inference_model(loaded_obj: Any, sample_graph: Any | None = None):
     """Resolve a torch model object from a loaded .pt payload."""
     if hasattr(loaded_obj, "eval"):
         loaded_obj.eval()
@@ -443,12 +538,28 @@ def _resolve_inference_model(loaded_obj: Any):
                 return candidate
 
         if "state_dict" in loaded_obj or "model_state_dict" in loaded_obj:
-            raise ValueError(
-                "Model file contains only a state_dict. "
-                "Please export a loadable model object or TorchScript module for inference."
-            )
+            return _rebuild_model_from_checkpoint(loaded_obj, sample_graph=sample_graph)
 
     raise ValueError("Unsupported model format. Expected a loadable model object in .pt file.")
+
+
+def _load_score_model(model_path: Path, sample_graph: Any | None = None) -> Any:
+    """Load one local score model for inference and explanation."""
+    import torch
+    from sklearn.exceptions import InconsistentVersionWarning
+
+    print(f"[model] Loading checkpoint from: {model_path}")
+    with warnings.catch_warnings():
+        # The website does not use the serialized sklearn scaler object for inference.
+        warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+        try:
+            # PyTorch >=2.6 defaults to weights_only=True; force full object load for trusted local model files.
+            loaded = torch.load(model_path, map_location="cpu", weights_only=False)
+        except TypeError:
+            loaded = torch.load(model_path, map_location="cpu")
+    model = _resolve_inference_model(loaded, sample_graph=sample_graph)
+    print(f"[model] Loaded model successfully: {model_path.name} -> {type(model).__name__}")
+    return model
 
 
 def _extract_output_values(output: Any) -> List[float]:
@@ -471,6 +582,24 @@ def _extract_output_values(output: Any) -> List[float]:
 
     array = np.asarray(output).reshape(-1)
     return [float(x) for x in array]
+
+
+def _extract_output_tensor(output: Any):
+    """Normalize model output to a tensor-like object for scalar explanation targets."""
+    import torch
+
+    if isinstance(output, (list, tuple)):
+        if not output:
+            raise ValueError("Model returned an empty output container.")
+        output = output[0]
+
+    if not isinstance(output, torch.Tensor):
+        output = torch.as_tensor(output, dtype=torch.float32)
+
+    if output.numel() == 0:
+        raise ValueError("Model returned an empty tensor output.")
+
+    return output.reshape(-1)
 
 
 def _forward_model(model: Any, batch: Any) -> Any:
@@ -498,19 +627,168 @@ def _forward_model(model: Any, batch: Any) -> Any:
     raise RuntimeError(f"Failed to run model forward pass: {last_error}")
 
 
-def _predict_single_score_model(model_path: Path, graphs_flat: List[Any]) -> Dict[str, float]:
+def _clone_graph_for_explanation(graph: Any) -> Any:
+    """Clone one graph safely so explanation gradients do not mutate the cached inputs."""
+    if hasattr(graph, "clone"):
+        cloned = graph.clone()
+    else:
+        cloned = copy.deepcopy(graph)
+
+    if not hasattr(cloned, "x") or cloned.x is None:
+        raise ValueError("Graph is missing node features (x), required for explanation.")
+    if not hasattr(cloned, "edge_index") or cloned.edge_index is None:
+        raise ValueError("Graph is missing edge_index, required for explanation.")
+
+    cloned.x = cloned.x.detach().clone().float().requires_grad_(True)
+    if hasattr(cloned, "edge_attr") and cloned.edge_attr is not None:
+        cloned.edge_attr = cloned.edge_attr.detach().clone().float().requires_grad_(True)
+    return cloned
+
+
+def _build_roi_importance_payload(roi_scores: np.ndarray) -> List[Dict[str, Any]]:
+    """Format per-ROI importance into a stable, frontend-friendly payload."""
+    payload: List[Dict[str, Any]] = []
+    for idx, score in enumerate(roi_scores):
+        payload.append(
+            {
+                "roi_index": idx + 1,
+                "label": _get_roi_label(idx + 1),
+                "importance": float(score),
+            }
+        )
+    payload.sort(key=lambda item: item["importance"], reverse=True)
+    return payload
+
+
+def _explain_single_score_model(
+    model: Any,
+    graphs: List[Any],
+    *,
+    top_k_edges: int = DEFAULT_XAI_TOP_K_EDGES,
+    top_k_windows: int = DEFAULT_XAI_TOP_K_WINDOWS,
+) -> Dict[str, Any]:
+    """
+    Explain one score model with gradient-based importance.
+
+    This implementation is intentionally simple and extensible:
+    - it treats the current scalar model output as the attribution target
+    - it uses raw gradients of `edge_attr` / `x`
+    - it can later be upgraded to Integrated Gradients by swapping the
+      per-window attribution computation while keeping the aggregation shape
+    - if the model does not expose edge_attr gradients, it falls back to
+      node/ROI gradients so inference remains compatible with more models
+    """
+    if not graphs:
+        raise ValueError("No graph windows available for explanation.")
+
+    import torch
+
+    model.eval()
+
+    edge_importance_accumulator: Dict[Tuple[int, int], List[float]] = {}
+    roi_window_scores: List[np.ndarray] = []
+    window_summaries: List[Dict[str, Any]] = []
+    used_edge_gradients = False
+
+    for window_index, raw_graph in enumerate(graphs):
+        graph = _clone_graph_for_explanation(raw_graph)
+
+        if getattr(graph, "batch", None) is None and hasattr(graph, "x"):
+            graph.batch = torch.zeros(graph.x.shape[0], dtype=torch.long)
+
+        model.zero_grad(set_to_none=True)
+        output = _forward_model(model, graph)
+        output_tensor = _extract_output_tensor(output)
+        scalar_output = output_tensor.mean()
+        scalar_output.backward()
+
+        if graph.x.grad is not None:
+            node_grad = graph.x.grad.detach().abs().reshape(graph.x.shape[0], -1)
+            node_scores = node_grad.mean(dim=1).cpu().numpy()
+        else:
+            node_scores = np.zeros(int(graph.x.shape[0]), dtype=float)
+
+        roi_scores = node_scores.astype(float, copy=True)
+        edge_scores = np.zeros(int(graph.edge_index.shape[1]), dtype=float)
+        edge_index = graph.edge_index.detach().cpu().numpy()
+
+        has_edge_gradients = (
+            hasattr(graph, "edge_attr")
+            and graph.edge_attr is not None
+            and graph.edge_attr.grad is not None
+        )
+
+        if has_edge_gradients:
+            used_edge_gradients = True
+            edge_grad = graph.edge_attr.grad.detach().abs().reshape(graph.edge_attr.shape[0], -1)
+            edge_scores = edge_grad.mean(dim=1).cpu().numpy()
+
+            for edge_pos, score in enumerate(edge_scores):
+                source = int(edge_index[0, edge_pos])
+                target = int(edge_index[1, edge_pos])
+                roi_scores[source] += float(score)
+                roi_scores[target] += float(score)
+
+                edge_key = tuple(sorted((source, target)))
+                edge_importance_accumulator.setdefault(edge_key, []).append(float(score))
+
+        roi_window_scores.append(roi_scores)
+        window_summaries.append(
+            {
+                "window_index": window_index,
+                "importance": float(np.sum(edge_scores) if has_edge_gradients else np.sum(roi_scores)),
+                "prediction": float(scalar_output.detach().cpu().item()),
+            }
+        )
+
+        model.zero_grad(set_to_none=True)
+
+    aggregated_edges: List[Dict[str, Any]] = []
+    for (source, target), scores in edge_importance_accumulator.items():
+        mean_score = float(np.mean(scores))
+        aggregated_edges.append(
+            {
+                "source_roi": source + 1,
+                "target_roi": target + 1,
+                "source_label": _get_roi_label(source + 1),
+                "target_label": _get_roi_label(target + 1),
+                "importance": mean_score,
+                "window_count": len(scores),
+            }
+        )
+
+    aggregated_edges.sort(key=lambda item: item["importance"], reverse=True)
+    top_edges = aggregated_edges[: max(0, int(top_k_edges))]
+
+    mean_roi_scores = np.mean(np.stack(roi_window_scores, axis=0), axis=0)
+    roi_importance = _build_roi_importance_payload(mean_roi_scores)
+
+    top_window_payload = sorted(
+        window_summaries,
+        key=lambda item: item["importance"],
+        reverse=True,
+    )[: max(0, int(top_k_windows))]
+
+    return {
+        "top_edges": top_edges,
+        "roi_importance": roi_importance,
+        "top_windows": top_window_payload,
+        "n_graph_windows": len(window_summaries),
+        "method": "gradient_edge_importance" if used_edge_gradients else "gradient_roi_importance",
+    }
+
+
+def _predict_single_score_model(model_or_path: Any, graphs_flat: List[Any]) -> Dict[str, float]:
     """Run model inference over graph windows and aggregate with mean + 95% CI."""
     if not graphs_flat:
         raise ValueError("No graph windows available for inference.")
 
     import torch
 
-    try:
-        # PyTorch >=2.6 defaults to weights_only=True; force full object load for trusted local model files.
-        loaded = torch.load(model_path, map_location="cpu", weights_only=False)
-    except TypeError:
-        loaded = torch.load(model_path, map_location="cpu")
-    model = _resolve_inference_model(loaded)
+    sample_graph = graphs_flat[0] if graphs_flat else None
+    model = _load_score_model(model_or_path, sample_graph=sample_graph) if isinstance(model_or_path, Path) else model_or_path
+    if hasattr(model, "eval"):
+        model.eval()
 
     predictions: List[float] = []
     batch_mode_success = False
@@ -566,24 +844,32 @@ def _predict_single_score_model(model_path: Path, graphs_flat: List[Any]) -> Dic
     }
 
 
-def _run_model_predictions(graphs_flat: List[Any]) -> Tuple[List[Dict[str, Any]], List[str], Dict[str, Any]]:
-    """Run all configured score models and return predictions plus errors."""
+def _run_model_predictions(
+    graphs_flat: List[Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str], Dict[str, Any]]:
+    """Run all configured score models and return predictions, explanations, and errors."""
     settings = get_settings()
     registry = build_model_registry(settings)
 
     predicted_scores: List[Dict[str, Any]] = []
+    explained_scores: List[Dict[str, Any]] = []
     prediction_errors: List[str] = []
 
     for score_name, model_meta in registry["models"].items():
         score_id = normalize_score_name(score_name)
+        print(f"[model] Starting prediction pipeline for score: {score_id}")
         if not model_meta.get("exists"):
+            print(f"[model] Skipping {score_id}: model file missing at {model_meta.get('path')}")
             prediction_errors.append(
                 f"{score_id}: model file missing ({model_meta.get('filename')})"
             )
             continue
 
         try:
-            prediction = _predict_single_score_model(Path(model_meta["path"]), graphs_flat)
+            sample_graph = graphs_flat[0] if graphs_flat else None
+            model = _load_score_model(Path(model_meta["path"]), sample_graph=sample_graph)
+            prediction = _predict_single_score_model(model, graphs_flat)
+            explanation = _explain_single_score_model(model, graphs_flat)
             predicted_scores.append(
                 {
                     "score_id": score_id,
@@ -595,10 +881,23 @@ def _run_model_predictions(graphs_flat: List[Any]) -> Tuple[List[Dict[str, Any]]
                     "source": "model",
                 }
             )
+            explained_scores.append(
+                {
+                    "score_id": score_id,
+                    "model_file": model_meta.get("filename"),
+                    "source": "gradient_edge_importance",
+                    **explanation,
+                }
+            )
+            print(
+                f"[model] Prediction succeeded for {score_id}: "
+                f"value={prediction['value']:.4f}, windows={prediction['n_graph_windows']}"
+            )
         except Exception as exc:
+            print(f"[model] Prediction failed for {score_id}: {exc}")
             prediction_errors.append(f"{score_id}: {exc}")
 
-    return predicted_scores, prediction_errors, registry
+    return predicted_scores, explained_scores, prediction_errors, registry
 
 
 def _build_results_payload(
@@ -633,6 +932,7 @@ def _build_results_payload(
     )
 
     predicted_scores: List[Dict[str, Any]] = []
+    explained_scores: List[Dict[str, Any]] = []
     prediction_errors: List[str] = []
     graph_windows_count = 0
     graph_meta: Dict[str, Any] = {
@@ -654,7 +954,7 @@ def _build_results_payload(
                 "graph_window_shift": int(graph_payload["shift"]),
             }
         )
-        predicted_scores, prediction_errors, model_registry = _run_model_predictions(
+        predicted_scores, explained_scores, prediction_errors, model_registry = _run_model_predictions(
             graph_payload["graphs_flat"]
         )
     except Exception as exc:
@@ -679,6 +979,7 @@ def _build_results_payload(
         "markers_view": markers_payload.get("view"),
         "markers_error": markers_payload.get("error"),
         "predicted_scores": predicted_scores,
+        "explained_scores": explained_scores,
         "prediction_errors": prediction_errors,
         "graph_window_count": graph_windows_count,
         "model_registry_dir": model_registry.get("model_registry_dir"),

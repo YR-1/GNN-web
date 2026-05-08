@@ -25,6 +25,44 @@ export interface PredictedScore {
   source?: string
 }
 
+export interface ExplainedEdge {
+  source_roi: number
+  target_roi: number
+  source_label?: string
+  target_label?: string
+  importance: number
+  window_count?: number
+}
+
+export interface ROIImportance {
+  roi_index: number
+  label: string
+  importance: number
+}
+
+export interface ExplainedWindow {
+  window_index: number
+  importance: number
+  prediction: number
+}
+
+export interface ExplainedScore {
+  score_id: string
+  model_file?: string
+  source?: string
+  top_edges: ExplainedEdge[]
+  roi_importance: ROIImportance[]
+  top_windows: ExplainedWindow[]
+  n_graph_windows?: number
+  method?: string
+}
+
+export interface ModelRegistryEntry {
+  filename: string
+  path: string
+  exists: boolean
+}
+
 export interface TimeSeriesLine {
   roi_index: number
   label: string
@@ -58,8 +96,11 @@ export interface CorrelationResults {
   markers_view?: string
   markers_error?: string | null
   predicted_scores?: PredictedScore[]
+  explained_scores?: ExplainedScore[]
   prediction_errors?: string[]
   graph_window_count?: number
+  model_registry_dir?: string
+  model_registry?: Record<string, ModelRegistryEntry>
   time_series?: TimeSeriesPayload
   error?: string
 }

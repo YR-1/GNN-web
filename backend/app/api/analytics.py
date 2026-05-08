@@ -37,7 +37,7 @@ CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 MODEL_PERFORMANCE_SEEDS = [
-    ("wm", "Working Memory", 0.882, 0.00041, 3.28, 1.2),
+    ("listsort_ageadj", "ListSort (Age Adjusted)", 0.882, 0.00041, 3.28, 1.2),
     ("fluid_iq", "Fluid Intelligence", 0.844, 0.00073, 3.71, 2.4),
     ("attention", "Sustained Attention", 0.806, 0.00124, 4.09, 3.1),
     ("processing_speed", "Processing Speed", 0.793, 0.00192, 4.42, 4.7),

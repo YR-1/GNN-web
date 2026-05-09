@@ -129,7 +129,7 @@ export default function UploadPage() {
       clearSelectedFiles()
 
       if (executionIds.length === 1) {
-        router.push(`/analysis/${executionIds[0]}/loading`)
+        router.push(`/analysis/${executionIds[0]}/loading?fileName=${encodeURIComponent(selectedFiles[0].name)}`)
       } else {
         router.push('/history')
       }
@@ -305,7 +305,7 @@ export default function UploadPage() {
                 type='button'
                 disabled={uploading || selectedFiles.length === 0}
                 onClick={clearSelectedFiles}
-                className='btn-upload-secondary disabled:opacity-50 disabled:cursor-not-allowed'
+                className='btn-danger disabled:opacity-50 disabled:cursor-not-allowed'
               >
                 Clear file list
               </button>
@@ -339,9 +339,6 @@ export default function UploadPage() {
                 Multiple files are uploaded sequentially via the existing API
               </li>
             </ul>
-            <div className='rounded-xl border border-brand-400/20 bg-white/85 p-3 text-xs text-ink-700'>
-              After upload: single file opens its loading page, multiple files redirect to history for tracking.
-            </div>
           </aside>
         </form>
 

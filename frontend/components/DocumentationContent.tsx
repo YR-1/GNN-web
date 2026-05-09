@@ -13,7 +13,7 @@ import {
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function DocumentationPage() {
+export function DocumentationContent() {
   return (
     <div className='page-container space-y-5'>
       <header>
@@ -266,7 +266,7 @@ export default function DocumentationPage() {
               <AccordionContent className='text-slate-700'>
                 This is a demonstration application for a Final Year Project. In the current implementation, data is
                 processed within your active session and is not intended for permanent storage. Always follow your
-                institution's data governance policies before uploading sensitive data.
+                institution&apos;s data governance policies before uploading sensitive data.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

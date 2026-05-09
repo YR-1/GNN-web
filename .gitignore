@@ -67,6 +67,8 @@ temp/
 *.tmp
 backend/.runtime/
 
+venv
+
 # Dependencies lock files (optional - keep them for reproducible builds)
 # package-lock.json
 # yarn.lock

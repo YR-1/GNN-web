@@ -28,8 +28,8 @@ const generateScatterData = (seed: number, correlation: number): ScatterPoint[] 
 
 export const modelPerformanceData: ModelPerformance[] = [
   {
-    id: 'wm',
-    behavioralScore: 'Working Memory',
+    id: 'listsort_ageadj',
+    behavioralScore: 'ListSort (Age Adjusted)',
     correlation: 0.882,
     pValue: 0.00041,
     mse: 3.28,

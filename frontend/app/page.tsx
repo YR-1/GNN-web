@@ -1,14 +1,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { cookies } from 'next/headers'
-import { Brain, TrendingUp, Zap, BarChart3, Users, CheckCircle2, ArrowRight, TestTubeDiagonal } from 'lucide-react'
+import { Brain, TrendingUp, BarChart3, CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 
 export default function RootPage() {
-  const token = cookies().get('token')?.value
-  const docsHref = token ? '/documentation' : '/login?from=%2Fdocumentation'
-
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
@@ -16,17 +12,19 @@ export default function RootPage() {
         <div className='absolute inset-0 bg-gradient-to-br from-brand-500/5 via-transparent to-brand-500/5' />
         <div className='max-w-7xl mx-auto px-6 py-20 relative'>
           <div className='max-w-4xl mx-auto text-center'>
-            <div className='flex items-center justify-center gap-3 sm:gap-4 mb-6'>
-              <div className='w-20 h-20 rounded-2xl flex items-center justify-center'>
+            <div className='mb-8 flex justify-center'>
+              <div className='inline-flex items-center justify-center gap-4 px-2 py-2'>
                 <Image
                   src='/fyp-logo-brain.png'
                   alt='MindPulse logo'
-                  width={72}
-                  height={72}
-                  className='h-[72px] w-[72px] object-contain'
+                  width={88}
+                  height={88}
+                  className='h-[68px] w-[68px] object-contain sm:h-[88px] sm:w-[88px]'
                 />
+                <span className='font-display text-3xl font-bold leading-none text-ink-950 sm:text-5xl'>
+                  MindPulse
+                </span>
               </div>
-              <span className='font-display text-2xl sm:text-3xl font-bold text-ink-950'>MindPulse</span>
             </div>
             <h1 className='text-4xl sm:text-5xl font-display font-bold text-ink-950 mb-6'>
               Predict Human Behavior from Brain Activity
@@ -41,7 +39,7 @@ export default function RootPage() {
                   <ArrowRight className='w-4 h-4 ml-2' />
                 </Button>
               </Link>
-              <Link href={docsHref}>
+              <Link href='/documentation'>
                 <Button size='lg' variant='outline'>
                   View Documentation
                 </Button>

@@ -4,6 +4,13 @@ export interface SimulatedScoreResult {
   value: number
   ci95Lower: number
   ci95Upper: number
+  source?: 'model' | 'simulated'
+  modelFile?: string
+  modelArchitecture?: string
+  nGraphWindows?: number
+  valueScale?: string
+  normalizedValue?: number
+  targetScaler?: string
 }
 
 /**

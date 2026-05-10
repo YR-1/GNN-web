@@ -5,6 +5,7 @@ from app.core.model_registry import build_model_registry, ensure_model_registry_
 from app.core.preflight import run_dependency_preflight
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
+from app.services.model_service import configure_torch_runtime, preload_configured_score_models
 
 settings = get_settings()
 
@@ -32,12 +33,14 @@ app.include_router(auth_router)
 async def startup_dependency_check():
     """Print dependency health before serving requests."""
     run_dependency_preflight(strict=settings.strict_dependency_check)
+    configure_torch_runtime(settings)
     model_registry_dir = ensure_model_registry_dir(settings)
     model_registry = build_model_registry(settings)
     print(f"[Model Registry] Directory: {model_registry_dir}")
     for score_name, metadata in model_registry["models"].items():
         status = "FOUND" if metadata["exists"] else "MISSING"
         print(f"  - {score_name}: {metadata['filename']} [{status}]")
+    preload_configured_score_models(settings)
 
 
 @app.get("/health")

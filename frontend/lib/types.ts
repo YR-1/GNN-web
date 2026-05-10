@@ -22,6 +22,10 @@ export interface PredictedScore {
   ci95_upper?: number
   n_graph_windows?: number
   model_file?: string
+  model_architecture?: string
+  value_scale?: string
+  normalized_value?: number
+  target_scaler?: string
   source?: string
 }
 
@@ -82,7 +86,7 @@ export interface CorrelationResults {
   n_rois: number
   n_timepoints: number
   correlation_matrix: number[][]
-  plotly_json: PlotlyJson
+  plotly_json?: PlotlyJson | null
   file_size: number
   file_name: string
   nilearn_connectome_html?: string | null

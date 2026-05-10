@@ -24,6 +24,22 @@ function formatValue(value: number, scoreDef: ScoreDefinition): string {
   return Math.round(value).toString()
 }
 
+function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueScale?: string): string {
+  if (valueScale === 'normalized') return value.toFixed(3)
+  return formatValue(value, scoreDef)
+}
+
+function formatPredictionUnit(scoreDef: ScoreDefinition, valueScale?: string): string {
+  if (valueScale === 'normalized') return 'normalized'
+  return scoreDef.unit
+}
+
+function sourceBadgeClass(source?: string): string {
+  return source === 'model'
+    ? 'bg-emerald-100 text-emerald-800 border-emerald-300/80'
+    : 'bg-amber-100 text-amber-800 border-amber-300/80'
+}
+
 const linkBadgeClass = (link: ConnectomeLink) =>
   link.sign === 'positive'
     ? 'bg-rose-100 text-rose-800 border-rose-300/70'
@@ -94,9 +110,14 @@ export default function BrainVisualizationPanel({
                     />
                     <span>{scoreDef.shortName}</span>
                     {sv && (
-                      <span className='font-semibold' style={{ color: scoreDef.accentColor }}>
-                        {formatValue(sv.value, scoreDef)}
-                      </span>
+                      <>
+                        <span className='font-semibold' style={{ color: scoreDef.accentColor }}>
+                          {formatPredictionValue(sv.value, scoreDef, sv.valueScale)}
+                        </span>
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${sourceBadgeClass(sv.source)}`}>
+                          {sv.source === 'model' ? 'Model' : 'Sim'}
+                        </span>
+                      </>
                     )}
                   </button>
                 )
@@ -112,14 +133,27 @@ export default function BrainVisualizationPanel({
           <div>
             <p className='text-sm font-semibold text-ink-950'>{selectedScore.name}</p>
             <p className='text-[11px] text-ink-600'>{selectedScore.description}</p>
+            <p className='mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-600'>
+              <span className={`rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide ${sourceBadgeClass(result.source)}`}>
+                {result.source === 'model' ? 'Model prediction' : 'Simulated fallback'}
+              </span>
+              {result.modelFile && <span>File: {result.modelFile}</span>}
+              {result.modelArchitecture && <span>Architecture: {result.modelArchitecture}</span>}
+              {result.nGraphWindows && <span>Windows: {result.nGraphWindows}</span>}
+              {result.normalizedValue !== undefined && result.valueScale === 'original' && (
+                <span>Normalized: {result.normalizedValue.toFixed(3)}</span>
+              )}
+            </p>
           </div>
           <div className='text-right shrink-0'>
             <span className='text-xl font-semibold' style={{ color: selectedScore.accentColor }}>
-              {formatValue(result.value, selectedScore)}
+              {formatPredictionValue(result.value, selectedScore, result.valueScale)}
             </span>
-            <span className='text-xs text-ink-600 ml-1'>{selectedScore.unit}</span>
+            <span className='text-xs text-ink-600 ml-1'>
+              {formatPredictionUnit(selectedScore, result.valueScale)}
+            </span>
             <p className='text-[10px] text-ink-600'>
-              95% CI: {formatValue(result.ci95Lower, selectedScore)} – {formatValue(result.ci95Upper, selectedScore)}
+              95% CI: {formatPredictionValue(result.ci95Lower, selectedScore, result.valueScale)} - {formatPredictionValue(result.ci95Upper, selectedScore, result.valueScale)}
             </p>
           </div>
         </div>
@@ -218,3 +252,4 @@ export default function BrainVisualizationPanel({
     </div>
   )
 }
+

@@ -7,10 +7,6 @@ from .config import Settings
 
 DEFAULT_SCORE_MODELS = [
     "listsort_ageadj",
-    "sleep_quality",
-    "emotion_recognition",
-    "sustained_attention",
-    "pmat",
 ]
 
 
@@ -54,6 +50,16 @@ def resolve_model_path(settings: Settings, score_name: str) -> Path:
     return resolve_model_registry_dir(settings) / f"{score_key}.pt"
 
 
+def resolve_target_scaler_json_path(settings: Settings, score_name: str) -> Path:
+    score_key = normalize_score_name(score_name)
+    return resolve_model_registry_dir(settings) / "scalers" / f"{score_key}_target_scaler.json"
+
+
+def resolve_target_scaler_joblib_path(settings: Settings, score_name: str) -> Path:
+    score_key = normalize_score_name(score_name)
+    return resolve_model_registry_dir(settings) / "scalers" / f"{score_key}_target_scaler.joblib"
+
+
 def build_model_registry(settings: Settings) -> Dict[str, object]:
     """
     Build score->model path mapping from env configuration.
@@ -65,10 +71,16 @@ def build_model_registry(settings: Settings) -> Dict[str, object]:
     models: Dict[str, Dict[str, object]] = {}
     for score_name in score_names:
         path = resolve_model_path(settings, score_name)
+        scaler_json_path = resolve_target_scaler_json_path(settings, score_name)
+        scaler_joblib_path = resolve_target_scaler_joblib_path(settings, score_name)
         models[score_name] = {
             "filename": path.name,
             "path": str(path),
             "exists": path.exists(),
+            "target_scaler_json": str(scaler_json_path),
+            "target_scaler_json_exists": scaler_json_path.exists(),
+            "target_scaler_joblib": str(scaler_joblib_path),
+            "target_scaler_joblib_exists": scaler_joblib_path.exists(),
         }
 
     return {

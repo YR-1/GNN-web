@@ -5,6 +5,7 @@ import io
 import json
 import numpy as np
 import sys
+import threading
 import warnings
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
@@ -18,6 +19,10 @@ from pathlib import Path
 from ..data.shen268_mni_coords import SHEN268_MNI_COORDS
 
 
+_MODEL_CACHE: Dict[str, Dict[str, Any]] = {}
+_MODEL_CACHE_LOCK = threading.Lock()
+
+
 def cov2corr(covariance: np.ndarray) -> np.ndarray:
     """Convert covariance matrix to correlation matrix."""
     v = np.sqrt(np.diag(covariance))
@@ -25,6 +30,10 @@ def cov2corr(covariance: np.ndarray) -> np.ndarray:
     corr = covariance / outer_v
     corr[covariance == 0] = 0
     return corr
+
+
+def _round_float_list(values: np.ndarray, decimals: int = 6) -> List[float]:
+    return np.round(values.astype(float), decimals=decimals).tolist()
 
 
 def compute_corr(ts: np.ndarray, method: str = "pearson") -> np.ndarray:
@@ -321,8 +330,10 @@ def create_nilearn_markers_payload(
 EXPECTED_NROIS = 268
 DEFAULT_WSIZE = 20
 DEFAULT_SHIFT = 10
+DEFAULT_INFERENCE_BATCH_SIZE = 8
 DEFAULT_XAI_TOP_K_EDGES = 10
 DEFAULT_XAI_TOP_K_WINDOWS = 3
+DEFAULT_XAI_MAX_WINDOWS = 3
 
 
 def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -466,7 +477,13 @@ def _infer_input_dim_from_checkpoint(state_dict: Dict[str, Any], sample_graph: A
     if sample_graph is not None and hasattr(sample_graph, "x") and sample_graph.x is not None:
         return int(sample_graph.x.shape[-1])
 
-    for key in ("input_proj.weight", "gat1.lin_l.weight", "gat1.lin_r.weight"):
+    for key in (
+        "node_encoder.0.weight",
+        "encoder.0.weight",
+        "input_proj.weight",
+        "gat1.lin_l.weight",
+        "gat1.lin_r.weight",
+    ):
         weight = state_dict.get(key)
         if weight is not None and hasattr(weight, "shape") and len(weight.shape) >= 2:
             return int(weight.shape[1])
@@ -482,9 +499,24 @@ def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any
 
     config = loaded_obj.get("config", {}) if isinstance(loaded_obj.get("config", {}), dict) else {}
     in_dim = _infer_input_dim_from_checkpoint(state_dict, sample_graph)
+
+    try:
+        from .fbnetgen_inference import build_fbnetgen_from_checkpoint
+
+        model, architecture, _ = build_fbnetgen_from_checkpoint(
+            loaded_obj,
+            in_dim=in_dim,
+        )
+        setattr(model, "_checkpoint_architecture", architecture)
+        setattr(model, "_prediction_scale", "normalized")
+        print(f"[model] Reconstructed checkpoint architecture: {architecture}")
+        return model
+    except Exception as exc:
+        fbnetgen_error = str(exc)
+
     improved_cls, basic_cls = _import_gatv2_model_classes()
 
-    build_errors: List[str] = []
+    build_errors: List[str] = [f"FBNetGen: {fbnetgen_error}"]
 
     if improved_cls is not None:
         try:
@@ -543,12 +575,17 @@ def _resolve_inference_model(loaded_obj: Any, sample_graph: Any | None = None):
     raise ValueError("Unsupported model format. Expected a loadable model object in .pt file.")
 
 
-def _load_score_model(model_path: Path, sample_graph: Any | None = None) -> Any:
-    """Load one local score model for inference and explanation."""
+def _model_cache_key(model_path: Path) -> str:
+    resolved = model_path.resolve()
+    stat = resolved.stat()
+    return f"{resolved}|{stat.st_mtime_ns}|{stat.st_size}"
+
+
+def _load_score_model_uncached(model_path: Path, sample_graph: Any | None = None) -> Any:
+    """Load and reconstruct one local score model for inference."""
     import torch
     from sklearn.exceptions import InconsistentVersionWarning
 
-    print(f"[model] Loading checkpoint from: {model_path}")
     with warnings.catch_warnings():
         # The website does not use the serialized sklearn scaler object for inference.
         warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
@@ -558,8 +595,71 @@ def _load_score_model(model_path: Path, sample_graph: Any | None = None) -> Any:
         except TypeError:
             loaded = torch.load(model_path, map_location="cpu")
     model = _resolve_inference_model(loaded, sample_graph=sample_graph)
-    print(f"[model] Loaded model successfully: {model_path.name} -> {type(model).__name__}")
+    setattr(model, "_inference_lock", threading.RLock())
     return model
+
+
+def _load_score_model(model_path: Path, sample_graph: Any | None = None) -> Any:
+    """Load one local score model for inference and explanation, reusing cached reconstructions."""
+    model_path = model_path.resolve()
+    cache_key = _model_cache_key(model_path)
+
+    cached = _MODEL_CACHE.get(cache_key)
+    if cached is not None:
+        model = cached["model"]
+        print(f"[model] Using cached checkpoint: {model_path.name} -> {type(model).__name__}")
+        return model
+
+    with _MODEL_CACHE_LOCK:
+        cached = _MODEL_CACHE.get(cache_key)
+        if cached is not None:
+            model = cached["model"]
+            print(f"[model] Using cached checkpoint: {model_path.name} -> {type(model).__name__}")
+            return model
+
+        print(f"[model] Loading checkpoint from: {model_path}")
+        model = _load_score_model_uncached(model_path, sample_graph=sample_graph)
+        path_prefix = f"{model_path}|"
+        for stale_key in [key for key in _MODEL_CACHE if key.startswith(path_prefix)]:
+            _MODEL_CACHE.pop(stale_key, None)
+        _MODEL_CACHE[cache_key] = {"model": model}
+        print(f"[model] Loaded model successfully: {model_path.name} -> {type(model).__name__}")
+    return model
+
+
+def preload_configured_score_models(settings: Any) -> None:
+    """Warm local model cache at startup for configured, existing checkpoints."""
+    registry = build_model_registry(settings)
+    for score_name, model_meta in registry["models"].items():
+        if not model_meta.get("exists"):
+            continue
+        try:
+            model = _load_score_model(Path(str(model_meta["path"])), sample_graph=None)
+            architecture = getattr(model, "_checkpoint_architecture", type(model).__name__)
+            print(f"[model] Preloaded {score_name}: {model_meta.get('filename')} ({architecture})")
+        except Exception as exc:
+            print(f"[model] Failed to preload {score_name}: {exc}")
+
+
+def configure_torch_runtime(settings: Any) -> None:
+    """Tune PyTorch CPU threading for small batched GNN inference."""
+    try:
+        import torch
+    except Exception as exc:
+        print(f"[model] PyTorch runtime tuning skipped: {exc}")
+        return
+
+    num_threads = max(1, int(getattr(settings, "torch_num_threads", 4)))
+    interop_threads = max(1, int(getattr(settings, "torch_num_interop_threads", 1)))
+    torch.set_num_threads(num_threads)
+    try:
+        torch.set_num_interop_threads(interop_threads)
+    except RuntimeError:
+        pass
+    print(
+        f"[model] PyTorch CPU threads: intraop={torch.get_num_threads()}, "
+        f"interop={interop_threads}"
+    )
 
 
 def _extract_output_values(output: Any) -> List[float]:
@@ -582,6 +682,35 @@ def _extract_output_values(output: Any) -> List[float]:
 
     array = np.asarray(output).reshape(-1)
     return [float(x) for x in array]
+
+
+def _load_target_scaler_stats(scaler_json_path: Optional[Path]) -> Optional[Dict[str, float]]:
+    """Load a JSON target scaler without depending on sklearn/joblib at runtime."""
+    if scaler_json_path is None or not scaler_json_path.exists():
+        return None
+
+    with scaler_json_path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    if str(payload.get("method", "")).lower() != "standard":
+        raise ValueError(
+            f"Unsupported target scaler method in {scaler_json_path}: {payload.get('method')}"
+        )
+
+    mean = float(payload["original_mean"])
+    scale = float(payload["original_std"])
+    if not np.isfinite(mean) or not np.isfinite(scale) or scale <= 0:
+        raise ValueError(f"Invalid target scaler statistics in {scaler_json_path}.")
+
+    return {
+        "mean": mean,
+        "scale": scale,
+    }
+
+
+def _inverse_transform_standard_target(values: np.ndarray, scaler_stats: Dict[str, float]) -> np.ndarray:
+    """Invert StandardScaler target normalization: original = normalized * scale + mean."""
+    return values * float(scaler_stats["scale"]) + float(scaler_stats["mean"])
 
 
 def _extract_output_tensor(output: Any):
@@ -666,6 +795,7 @@ def _explain_single_score_model(
     *,
     top_k_edges: int = DEFAULT_XAI_TOP_K_EDGES,
     top_k_windows: int = DEFAULT_XAI_TOP_K_WINDOWS,
+    max_windows: int = DEFAULT_XAI_MAX_WINDOWS,
 ) -> Dict[str, Any]:
     """
     Explain one score model with gradient-based importance.
@@ -684,13 +814,15 @@ def _explain_single_score_model(
     import torch
 
     model.eval()
+    total_graph_windows = len(graphs)
+    explanation_graphs = graphs[: max(1, min(int(max_windows), total_graph_windows))]
 
     edge_importance_accumulator: Dict[Tuple[int, int], List[float]] = {}
     roi_window_scores: List[np.ndarray] = []
     window_summaries: List[Dict[str, Any]] = []
     used_edge_gradients = False
 
-    for window_index, raw_graph in enumerate(graphs):
+    for window_index, raw_graph in enumerate(explanation_graphs):
         graph = _clone_graph_for_explanation(raw_graph)
 
         if getattr(graph, "batch", None) is None and hasattr(graph, "x"):
@@ -774,11 +906,18 @@ def _explain_single_score_model(
         "roi_importance": roi_importance,
         "top_windows": top_window_payload,
         "n_graph_windows": len(window_summaries),
+        "total_graph_windows": total_graph_windows,
+        "max_windows": int(max_windows),
         "method": "gradient_edge_importance" if used_edge_gradients else "gradient_roi_importance",
     }
 
 
-def _predict_single_score_model(model_or_path: Any, graphs_flat: List[Any]) -> Dict[str, float]:
+def _predict_single_score_model(
+    model_or_path: Any,
+    graphs_flat: List[Any],
+    *,
+    target_scaler_json_path: Optional[Path] = None,
+) -> Dict[str, Any]:
     """Run model inference over graph windows and aggregate with mean + 95% CI."""
     if not graphs_flat:
         raise ValueError("No graph windows available for inference.")
@@ -796,7 +935,11 @@ def _predict_single_score_model(model_or_path: Any, graphs_flat: List[Any]) -> D
     try:
         from torch_geometric.loader import DataLoader
 
-        loader = DataLoader(graphs_flat, batch_size=min(16, len(graphs_flat)), shuffle=False)
+        loader = DataLoader(
+            graphs_flat,
+            batch_size=min(DEFAULT_INFERENCE_BATCH_SIZE, len(graphs_flat)),
+            shuffle=False,
+        )
         with torch.no_grad():
             for batch in loader:
                 output = _forward_model(model, batch)
@@ -828,7 +971,14 @@ def _predict_single_score_model(model_or_path: Any, graphs_flat: List[Any]) -> D
     if not predictions:
         raise ValueError("Model produced no prediction values.")
 
-    values_arr = np.asarray(predictions, dtype=float)
+    normalized_values_arr = np.asarray(predictions, dtype=float)
+    values_arr = normalized_values_arr
+    value_scale = getattr(model, "_prediction_scale", "model_output")
+    scaler_stats = _load_target_scaler_stats(target_scaler_json_path)
+    if scaler_stats is not None:
+        values_arr = _inverse_transform_standard_target(normalized_values_arr, scaler_stats)
+        value_scale = "original"
+
     mean = float(values_arr.mean())
     if values_arr.size > 1:
         std = float(values_arr.std(ddof=1))
@@ -836,11 +986,16 @@ def _predict_single_score_model(model_or_path: Any, graphs_flat: List[Any]) -> D
     else:
         ci_half = 0.0
 
+    normalized_mean = float(normalized_values_arr.mean())
+
     return {
         "value": mean,
         "ci95_lower": mean - ci_half,
         "ci95_upper": mean + ci_half,
         "n_graph_windows": int(values_arr.size),
+        "value_scale": value_scale,
+        "normalized_value": normalized_mean,
+        "target_scaler": str(target_scaler_json_path) if scaler_stats is not None else None,
     }
 
 
@@ -868,8 +1023,18 @@ def _run_model_predictions(
         try:
             sample_graph = graphs_flat[0] if graphs_flat else None
             model = _load_score_model(Path(model_meta["path"]), sample_graph=sample_graph)
-            prediction = _predict_single_score_model(model, graphs_flat)
-            explanation = _explain_single_score_model(model, graphs_flat)
+            target_scaler_json = (
+                Path(str(model_meta["target_scaler_json"]))
+                if model_meta.get("target_scaler_json_exists")
+                else None
+            )
+            model_lock = getattr(model, "_inference_lock", threading.RLock())
+            with model_lock:
+                prediction = _predict_single_score_model(
+                    model,
+                    graphs_flat,
+                    target_scaler_json_path=target_scaler_json,
+                )
             predicted_scores.append(
                 {
                     "score_id": score_id,
@@ -878,15 +1043,11 @@ def _run_model_predictions(
                     "ci95_upper": prediction["ci95_upper"],
                     "n_graph_windows": prediction["n_graph_windows"],
                     "model_file": model_meta.get("filename"),
+                    "model_architecture": getattr(model, "_checkpoint_architecture", None),
+                    "value_scale": prediction["value_scale"],
+                    "normalized_value": prediction["normalized_value"],
+                    "target_scaler": prediction["target_scaler"],
                     "source": "model",
-                }
-            )
-            explained_scores.append(
-                {
-                    "score_id": score_id,
-                    "model_file": model_meta.get("filename"),
-                    "source": "gradient_edge_importance",
-                    **explanation,
                 }
             )
             print(
@@ -909,27 +1070,46 @@ def _build_results_payload(
     """
     Build analysis payload from a single in-memory timeseries using one correlation computation.
     """
+    settings = get_settings()
     n_timepoints, n_rois = ts.shape
     corr_matrix = compute_corr(ts, method="pearson")
     heatmap_title = _build_compact_plot_title("ROI Correlation Matrix", file_name, max_file_chars=34)
     connectome_title = _build_compact_plot_title("Top 3 Global Links", file_name, max_file_chars=30)
     marker_title = _build_compact_plot_title("Node strength from top 3 links", file_name, max_file_chars=30)
 
-    plotly_json = create_plotly_heatmap(
-        corr_matrix,
-        title=heatmap_title,
+    plotly_json = (
+        create_plotly_heatmap(corr_matrix, title=heatmap_title)
+        if settings.generate_plotly_json
+        else None
     )
-    nilearn_payload = create_nilearn_connectome_payload(
-        corr_matrix,
-        top_k=3,
-        title=connectome_title,
-    )
-    markers_payload = create_nilearn_markers_payload(
-        corr_matrix,
-        top_links=nilearn_payload.get("top_links", []),
-        top_k=3,
-        title=marker_title,
-    )
+    _, top_links = _build_top_k_adjacency(corr_matrix, k=3)
+    if settings.generate_neuro_visuals:
+        nilearn_payload = create_nilearn_connectome_payload(
+            corr_matrix,
+            top_k=3,
+            title=connectome_title,
+        )
+        top_links = nilearn_payload.get("top_links", top_links)
+        markers_payload = create_nilearn_markers_payload(
+            corr_matrix,
+            top_links=top_links,
+            top_k=3,
+            title=marker_title,
+        )
+    else:
+        nilearn_payload = {
+            "html": None,
+            "top_link_count": len(top_links),
+            "library": "disabled",
+            "coordinates_source": "shen268_mni_atlas",
+            "error": None,
+        }
+        markers_payload = {
+            "png_base64": None,
+            "library": "disabled",
+            "view": "ortho",
+            "error": None,
+        }
 
     predicted_scores: List[Dict[str, Any]] = []
     explained_scores: List[Dict[str, Any]] = []
@@ -964,12 +1144,12 @@ def _build_results_payload(
     results = {
         "n_rois": int(n_rois),
         "n_timepoints": int(n_timepoints),
-        "correlation_matrix": corr_matrix.tolist(),
+        "correlation_matrix": np.round(corr_matrix.astype(float), decimals=6).tolist(),
         "plotly_json": plotly_json,
         "file_size": file_size,
         "file_name": file_name,
         "nilearn_connectome_html": nilearn_payload.get("html"),
-        "top_links": nilearn_payload.get("top_links", []),
+        "top_links": top_links,
         "top_link_count": int(nilearn_payload.get("top_link_count", 0)),
         "connectome_library": nilearn_payload.get("library"),
         "connectome_coordinates_source": nilearn_payload.get("coordinates_source"),
@@ -988,12 +1168,12 @@ def _build_results_payload(
             "source": "uploaded_file",
             "default_view": "global_plus_first_5_rois",
             "tr_index": list(range(int(n_timepoints))),
-            "global_signal": np.mean(ts, axis=1).astype(float).tolist(),
+            "global_signal": _round_float_list(np.mean(ts, axis=1)),
             "roi_series": [
                 {
                     "roi_index": idx + 1,
                     "label": _get_roi_label(idx + 1),
-                    "values": ts[:, idx].astype(float).tolist(),
+                    "values": _round_float_list(ts[:, idx]),
                 }
                 for idx in range(min(5, int(n_rois)))
             ],
@@ -1036,9 +1216,11 @@ async def _run_single_pass_pipeline(
             supabase_service = await get_supabase_service()
 
             if supabase_service:
-                graph_url = await supabase_service.save_correlation_graph(
-                    execution_id, user_id, plotly_json, file_name
-                )
+                graph_url = None
+                if plotly_json is not None:
+                    graph_url = await supabase_service.save_correlation_graph(
+                        execution_id, user_id, plotly_json, file_name
+                    )
                 matrix_url = await supabase_service.save_correlation_matrix(
                     execution_id, user_id, corr_matrix.tolist(), file_name
                 )

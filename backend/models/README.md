@@ -9,7 +9,7 @@ Model filenames are resolved by score name:
 - `listsort_ageadj` -> `listsort_ageadj.pt`
 - `sleep_quality` -> `sleep_quality.pt`
 - `emotion_recognition` -> `emotion_recognition.pt`
-- `sustained_attention` -> `sustained_attention.pt`
+- `picseq` -> `picseq.pt`
 - `pmat` -> `pmat.pt`
 
 Optional target scalers are resolved from `scalers/<score>_target_scaler.json`.
@@ -27,7 +27,7 @@ Current scaler artifacts:
 Configure in `backend/.env`:
 
 - `MODEL_REGISTRY_DIR=./models`
-- `MODEL_REGISTRY_SCORES=listsort_ageadj`
+- `MODEL_REGISTRY_SCORES=listsort_ageadj,sleep_quality,emotion_recognition,picseq,pmat`
 - `GENERATE_PLOTLY_JSON=false`
 - `GENERATE_NEURO_VISUALS=true`
 - `TORCH_NUM_THREADS=4`

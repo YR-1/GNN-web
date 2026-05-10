@@ -31,7 +31,6 @@ export function BoldTimeSeries({
 
     let cancelled = false
 
-<<<<<<< HEAD
     const renderPlot = async () => {
       const { default: Plotly } = await import('plotly.js-dist-min')
       if (cancelled || !plotRef.current) return
@@ -67,50 +66,33 @@ export function BoldTimeSeries({
           margin: { l: 56, r: 20, t: 44, b: 60 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
+          shapes:
+            highlightedTrIndex !== null
+              ? [
+                  {
+                    type: 'line' as const,
+                    x0: highlightedTrIndex,
+                    x1: highlightedTrIndex,
+                    y0: 0,
+                    y1: 1,
+                    xref: 'x' as const,
+                    yref: 'paper' as const,
+                    line: { color: '#f97316', width: 2, dash: 'dot' as const },
+                  },
+                ]
+              : [],
         },
         { responsive: true, displayModeBar: true, displaylogo: false }
       ).catch((err: unknown) => console.error('BOLD plot error:', err))
     }
 
     void renderPlot()
-=======
-    Plotly.newPlot(
-      plotRef.current,
-      traces,
-      {
-        title: { text: 'Uploaded fMRI Time Series (Global + First 5 ROIs)', font: { size: 14, color: '#0f172a' } },
-        xaxis: { title: { text: 'TR Index', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
-        yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
-        legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
-        autosize: true,
-        margin: { l: 56, r: 20, t: 44, b: 60 },
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        shapes:
-          highlightedTrIndex !== null
-            ? [
-                {
-                  type: 'line' as const,
-                  x0: highlightedTrIndex,
-                  x1: highlightedTrIndex,
-                  y0: 0,
-                  y1: 1,
-                  xref: 'x' as const,
-                  yref: 'paper' as const,
-                  line: { color: '#f97316', width: 2, dash: 'dot' as const },
-                },
-              ]
-            : [],
-      },
-      { responsive: true, displayModeBar: true, displaylogo: false }
-    ).catch((err: unknown) => console.error('BOLD plot error:', err))
->>>>>>> rq-branch
 
     return () => {
       cancelled = true
       if (plotRef.current) plotlyRef.current?.purge(plotRef.current)
     }
-  }, [hasData, timeSeries])
+  }, [hasData, highlightedTrIndex, timeSeries])
 
   if (!hasData) {
     return (

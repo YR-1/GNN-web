@@ -18,7 +18,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   } as const
 
   useEffect(() => {
-    if (!plotRef.current || !data.plotly_json) return
+    if (!plotRef.current) return
 
     let cancelled = false
 
@@ -28,7 +28,28 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
 
       plotlyRef.current = Plotly
 
-      const baseLayout = (data.plotly_json.layout ?? {}) as Record<string, unknown>
+      const fallbackPlotlyJson = {
+        data: [
+          {
+            z: data.correlation_matrix,
+            type: 'heatmap',
+            colorscale: 'RdBu',
+            zmid: 0,
+            zmin: -1,
+            zmax: 1,
+            colorbar: { title: 'Correlation' },
+          },
+        ],
+        layout: {
+          title: `ROI Correlation Matrix | ${fileName.replace(/\.[^.]+$/, '')}`,
+          xaxis: { title: 'ROI Index' },
+          yaxis: { title: 'ROI Index' },
+          height: 700,
+          width: 800,
+        },
+      }
+      const plotlyJson = data.plotly_json ?? fallbackPlotlyJson
+      const baseLayout = (plotlyJson.layout ?? {}) as Record<string, unknown>
       const baseXaxis = ((baseLayout.xaxis as Record<string, unknown> | undefined) ?? {})
       const baseYaxis = ((baseLayout.yaxis as Record<string, unknown> | undefined) ?? {})
       const layout = {
@@ -49,7 +70,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
         },
       }
 
-      Plotly.newPlot(plotRef.current, data.plotly_json.data ?? [], layout, {
+      Plotly.newPlot(plotRef.current, plotlyJson.data ?? [], layout, {
         responsive: true,
         displayModeBar: true,
         displaylogo: false,
@@ -82,7 +103,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
         plotlyRef.current?.purge(plotRef.current)
       }
     }
-  }, [data])
+  }, [data, fileName])
 
   const downloadAsJSON = () => {
     const dataString = JSON.stringify(data, null, 2)

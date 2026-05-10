@@ -71,7 +71,18 @@ export function PredictionReport({
       const ci95Lower = Number.isFinite(prediction.ci95_lower as number) ? Number(prediction.ci95_lower) : value
       const ci95Upper = Number.isFinite(prediction.ci95_upper as number) ? Number(prediction.ci95_upper) : value
 
-      byId[normalizedId] = { value, ci95Lower, ci95Upper }
+      byId[normalizedId] = {
+        value,
+        ci95Lower,
+        ci95Upper,
+        source: 'model',
+        modelFile: prediction.model_file,
+        modelArchitecture: prediction.model_architecture,
+        nGraphWindows: prediction.n_graph_windows,
+        valueScale: prediction.value_scale,
+        normalizedValue: prediction.normalized_value,
+        targetScaler: prediction.target_scaler,
+      }
     }
 
     return byId
@@ -100,7 +111,10 @@ export function PredictionReport({
         continue
       }
 
-      values[score.id] = simulateScore(score, results.correlation_matrix)
+      values[score.id] = {
+        ...simulateScore(score, results.correlation_matrix),
+        source: 'simulated',
+      }
     }
     return values
   }, [results?.correlation_matrix, results?.model_registry, modelPredictions])

@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
-from typing import Optional
+from typing import Any, Optional
 
 
 class Settings(BaseSettings):
@@ -31,10 +32,28 @@ class Settings(BaseSettings):
 
     # Prediction model registry
     model_registry_dir: str = "./models"
-    model_registry_scores: str = "listsort_ageadj,sleep_quality,emotion_recognition,sustained_attention,pmat"
+    model_registry_scores: str = "listsort_ageadj"
+
+    # Expensive visualization artifacts. Keep false for faster upload/prediction.
+    generate_plotly_json: bool = False
+    generate_neuro_visuals: bool = True
+    torch_num_threads: int = 4
+    torch_num_interop_threads: int = 1
     
     # CORS
     allowed_origins: list = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000"]
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug_flag(cls, value: Any) -> Any:
+        """Accept common logging/deployment labels for DEBUG without failing settings load."""
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production", "warn", "warning", "info"}:
+                return False
+            if normalized in {"dev", "development", "debug"}:
+                return True
+        return value
 
     def missing_supabase_fields(self) -> list[str]:
         missing = []

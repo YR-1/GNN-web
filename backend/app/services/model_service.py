@@ -76,16 +76,55 @@ def create_plotly_heatmap(corr: np.ndarray, title: str = "") -> Dict[str, Any]:
             zmid=0,
             zmin=-1,
             zmax=1,
-            colorbar=dict(title="Correlation"),
+            colorbar=dict(
+                title=dict(text="Correlation", side="top"),
+                thicknessmode="pixels",
+                thickness=20,
+                lenmode="pixels",
+                len=500,
+                yanchor="middle",
+                y=0.5,
+            ),
         )
     )
     fig.update_layout(
-        title=title or "ROI Correlation Matrix",
+        title=dict(
+            text=title or "ROI Correlation Matrix",
+            x=0.5,
+            xanchor="center",
+        ),
         xaxis_title="ROI Index",
         yaxis_title="ROI Index",
-        height=700,
-        width=800,
+        height=760,
+        width=760,
+        margin=dict(t=70, r=90, b=70, l=70),
+        xaxis=dict(
+            range=[0, 268],
+            autorange=False,
+            showline=True,
+            linewidth=1,
+            linecolor="black",
+            mirror=True,
+            domain=[0.0, 0.82],
+            constrain="domain",
+            fixedrange=True,
+        ),
+        yaxis=dict(
+            range=[0, 268],
+            autorange=False,
+            scaleanchor="x",
+            scaleratio=1,
+            showline=True,
+            linewidth=1,
+            linecolor="black",
+            mirror=True,
+            domain=[0.0, 1.0],
+            constrain="domain",
+            fixedrange=True,
+        ),
     )
+    fig.update_xaxes(range=[0, 268], autorange=False, constrain="domain", fixedrange=True)
+    fig.update_yaxes(range=[0, 268], autorange=False, constrain="domain", fixedrange=True)
     # Normalize Plotly output to plain JSON-compatible types (no numpy objects).
     return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 

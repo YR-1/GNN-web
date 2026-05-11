@@ -510,8 +510,8 @@ export default function Predictions2Page() {
         />
       </section>
 
-      <section className='grid grid-cols-1 gap-6 xl:grid-cols-2'>
-        <div className='space-y-4'>
+      <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
+        <div className='flex h-full flex-col space-y-4'>
           <div className='flex items-center gap-3'>
             <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
               <ChartNoAxesColumn className='h-5 w-5' />
@@ -521,10 +521,15 @@ export default function Predictions2Page() {
               <p className='text-sm text-ink-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
             </div>
           </div>
-          <CorrelationMatrix data={results} fileName={results.file_name} />
+          <CorrelationMatrix
+            data={results}
+            fileName={results.file_name}
+            title=''
+            subtitle=''
+          />
         </div>
 
-        <div className='space-y-4'>
+        <div className='flex h-full flex-col space-y-4'>
           <div className='flex items-center gap-3'>
             <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
               <Activity className='h-5 w-5' />
@@ -539,8 +544,8 @@ export default function Predictions2Page() {
           <BoldTimeSeries
             timeSeries={focusedTimeSeries}
             highlightedTrIndex={currentTrValue ?? null}
-            title='BOLD Signal Overview'
-            subtitle='Global Average plus ROI traces emphasized by the selected score explanation.'
+            title=''
+            subtitle=''
           />
         </div>
       </section>

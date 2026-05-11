@@ -40,13 +40,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
             colorbar: { title: 'Correlation' },
           },
         ],
-        layout: {
-          title: `ROI Correlation Matrix | ${fileName.replace(/\.[^.]+$/, '')}`,
-          xaxis: { title: 'ROI Index' },
-          yaxis: { title: 'ROI Index' },
-          height: 700,
-          width: 800,
-        },
+ 
       }
       const plotlyJson = data.plotly_json ?? fallbackPlotlyJson
       const baseLayout = (plotlyJson.layout ?? {}) as Record<string, unknown>
@@ -59,14 +53,24 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
         uirevision: 'correlation-matrix',
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        margin: { l: 40, r: 20, t: 48, b: 40 },
+        height: 550,
+        width: undefined,
+        margin: { l: 60, r: 100, t: 60, b: 60 },
         xaxis: {
           ...baseXaxis,
-          fixedrange: false,
+          range: [0, 268],
+          autorange: false,
+          constrain: 'domain',
+          fixedrange: true,
         },
         yaxis: {
           ...baseYaxis,
-          fixedrange: false,
+          range: [0, 268],
+          autorange: false,
+          scaleanchor: 'x',
+          scaleratio: 1,
+          constrain: 'domain',
+          fixedrange: true,
         },
       }
 
@@ -74,7 +78,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
         responsive: true,
         displayModeBar: true,
         displaylogo: false,
-        scrollZoom: true,
+        scrollZoom: false,
         modeBarButtonsToAdd: [
           'zoom2d',
           'pan2d',
@@ -139,8 +143,10 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
   const resetView = () => {
     if (!plotRef.current || !plotlyRef.current) return
     plotlyRef.current.relayout(plotRef.current, {
-      'xaxis.autorange': true,
-      'yaxis.autorange': true,
+      'xaxis.range': [0, 268],
+      'xaxis.autorange': false,
+      'yaxis.range': [0, 268],
+      'yaxis.autorange': false,
       dragmode: 'zoom',
     }).catch((error: unknown) => {
       console.error('Error resetting plot view:', error)
@@ -192,7 +198,7 @@ export default function CorrelationMatrix({ data, fileName }: CorrelationMatrixP
       </header>
 
       <div className='rounded-xl border border-brand-400/20 bg-white/82 overflow-hidden'>
-        <div ref={plotRef} style={{ width: '100%', height: '460px' }} />
+        <div ref={plotRef} style={{ width: '100%', height: '550px', margin: '0 auto' }} />
       </div>
       <p className='text-xs text-ink-700'>
         Plot controls are available below even if the floating Plotly toolbar is hidden.

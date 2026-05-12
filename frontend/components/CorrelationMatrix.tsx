@@ -47,7 +47,7 @@ export default function CorrelationMatrix({
             colorbar: { title: 'Correlation' },
           },
         ],
- 
+        layout: {},
       }
       const plotlyJson = data.plotly_json ?? fallbackPlotlyJson
       const baseLayout = (plotlyJson.layout ?? {}) as Record<string, unknown>

@@ -1,0 +1,12 @@
+{
+  "task": "PicSeq",
+  "fold_name": "graphs_outer1_inner1",
+  "fold_pkl": "/content/drive/MyDrive/gnn-mri-picseq_v2/graphs_outer1_inner1.pkl",
+  "method": "standard",
+  "n_train_windows": 10440,
+  "original_min": 76.41999816894531,
+  "original_max": 135.5500030517578,
+  "original_mean": 113.10163793892696,
+  "original_std": 12.965748276338593,
+  "scaler_file": "/content/drive/MyDrive/results/picseq_fbnetgen_h100_optuna_latest/scalers/graphs_outer1_inner1/target_scaler.joblib"
+}

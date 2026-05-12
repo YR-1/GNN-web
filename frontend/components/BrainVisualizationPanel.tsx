@@ -11,6 +11,7 @@ interface BrainVisualizationPanelProps {
   predictedValues: Record<string, SimulatedScoreResult>
   correlationMatrix: number[][]
   connectomeHtml?: string | null
+  listsortImportanceBrainUrl?: string | null
   selectedScoreId: string | null
   onSelectScore: (scoreId: string) => void
 }
@@ -49,6 +50,7 @@ export default function BrainVisualizationPanel({
   predictedValues,
   correlationMatrix,
   connectomeHtml,
+  listsortImportanceBrainUrl,
   selectedScoreId,
   onSelectScore,
 }: BrainVisualizationPanelProps) {
@@ -77,6 +79,7 @@ export default function BrainVisualizationPanel({
   }, [selectedScore])
 
   const result = selectedScore ? predictedValues[selectedScore.id] : null
+  const showListSortImportanceBrain = selectedScore?.id === 'listsort_ageadj'
 
   return (
     <div className='surface-card space-y-3'>
@@ -161,7 +164,20 @@ export default function BrainVisualizationPanel({
 
       {/* 3D Connectome */}
       <div className='rounded-xl border border-brand-400/20 bg-white/82 overflow-hidden'>
-        {connectomeHtml ? (
+        {showListSortImportanceBrain && listsortImportanceBrainUrl ? (
+          <iframe
+            title='Global ListSort FBNetGen importance brain'
+            src={listsortImportanceBrainUrl}
+            className='w-full border-0'
+            style={{ height: '620px' }}
+            sandbox='allow-scripts allow-same-origin'
+          />
+        ) : showListSortImportanceBrain ? (
+          <div className='flex flex-col items-center justify-center h-48 px-4 text-center text-sm text-ink-700'>
+            <p className='font-semibold text-ink-950'>ListSort importance brain not generated yet.</p>
+            <p>Run backend/scripts/build_listsort_importance_brain_html.py to create the cached 3D brain.</p>
+          </div>
+        ) : connectomeHtml ? (
           <iframe
             title={`Connectome for ${selectedScore?.shortName ?? 'brain'}`}
             srcDoc={connectomeHtml}

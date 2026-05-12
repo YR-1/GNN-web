@@ -366,6 +366,20 @@ def create_nilearn_markers_payload(
     }
 
 
+def get_cached_listsort_importance_brain_url() -> Optional[str]:
+    """Return the public URL for the cached global ListSort importance brain if generated."""
+    if LISTSORT_IMPORTANCE_BRAIN_HTML_PATH.exists():
+        return LISTSORT_IMPORTANCE_BRAIN_STATIC_URL
+    return None
+
+
+def get_cached_listsort_importance_static_brain_url() -> Optional[str]:
+    """Return the public URL for the cached 4-panel ListSort static brain if generated."""
+    if LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH.exists():
+        return LISTSORT_IMPORTANCE_STATIC_BRAIN_URL
+    return None
+
+
 EXPECTED_NROIS = 268
 DEFAULT_WSIZE = 20
 DEFAULT_SHIFT = 10
@@ -373,6 +387,20 @@ DEFAULT_INFERENCE_BATCH_SIZE = 8
 DEFAULT_XAI_TOP_K_EDGES = 10
 DEFAULT_XAI_TOP_K_WINDOWS = 3
 DEFAULT_XAI_MAX_WINDOWS = 3
+LISTSORT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/listsort_importance_3d.html"
+LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.png"
+LISTSORT_IMPORTANCE_BRAIN_HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "listsort_importance_3d.html"
+)
+LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "listsort_importance_4panel.png"
+)
 
 
 def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -1188,6 +1216,8 @@ def _build_results_payload(
         "file_size": file_size,
         "file_name": file_name,
         "nilearn_connectome_html": nilearn_payload.get("html"),
+        "listsort_importance_brain_url": get_cached_listsort_importance_brain_url(),
+        "listsort_importance_static_brain_url": get_cached_listsort_importance_static_brain_url(),
         "top_links": top_links,
         "top_link_count": int(nilearn_payload.get("top_link_count", 0)),
         "connectome_library": nilearn_payload.get("library"),

@@ -261,6 +261,46 @@ async def get_upload_file_row(upload_id: str, user_id: str) -> Optional[Dict[str
     return await service.get_upload_file_row(upload_id, user_id)
 
 
+async def delete_uploads(upload_ids: List[str], user_id: str) -> List[str]:
+    service = await _get_db_service()
+    unique_ids = [upload_id for upload_id in dict.fromkeys(upload_ids) if upload_id]
+    if not unique_ids:
+        return []
+
+    def op():
+        uploads_resp = (
+            service.client.table("file_uploads")
+            .select("upload_id,file_path")
+            .eq("user_id", user_id)
+            .in_("upload_id", unique_ids)
+            .execute()
+        )
+        uploads = uploads_resp.data or []
+        found_ids = [row["upload_id"] for row in uploads if row.get("upload_id")]
+        if not found_ids:
+            return []
+
+        service.client.table("model_executions").delete().eq("user_id", user_id).in_("upload_id", found_ids).execute()
+        service.client.table("file_uploads").delete().eq("user_id", user_id).in_("upload_id", found_ids).execute()
+
+        for row in uploads:
+            file_path = row.get("file_path")
+            if not file_path:
+                continue
+            try:
+                from pathlib import Path
+
+                path = Path(file_path)
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                continue
+
+        return found_ids
+
+    return await service._run(op)
+
+
 async def set_execution_status(execution_id: str, user_id: str, status: str) -> None:
     service = await _get_db_service()
     await service.set_execution_status(execution_id, user_id, status)

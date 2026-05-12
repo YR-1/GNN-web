@@ -49,6 +49,11 @@ export const api = {
   getStatus: (executionId: string) =>
     apiClient.get(`/api/status/${executionId}`),
   getHistory: () => apiClient.get('/api/history'),
+  deleteHistoryItems: (uploadIds: string[]) =>
+    apiClient.delete('/api/history', {
+      data: { upload_ids: uploadIds },
+      timeout: 15000,
+    }),
   getUploadContent: (uploadId: string, params?: { max_lines?: number; max_chars?: number }) =>
     apiClient.get(`/api/upload/${uploadId}/content`, { params }),
   getDashboardStats: () => apiClient.get('/api/dashboard'),

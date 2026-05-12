@@ -10,6 +10,8 @@ from ..models.schemas import (
     AnalysisResponse,
     ExecutionStatus,
     UploadContentResponse,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
     ModelPerformanceItem,
 )
 from ..core.security import verify_token
@@ -19,6 +21,7 @@ from ..services.model_service import process_txt_data
 from ..services.database import (
     create_upload_and_execution,
     get_analysis_row,
+    delete_uploads,
     get_dashboard_stats,
     get_execution_for_retry,
     get_history_rows,
@@ -257,6 +260,28 @@ async def get_history(
         return await get_history_rows(user_id=user_id, limit=50)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not fetch history: {exc}")
+
+
+@router.delete("/history", response_model=BulkDeleteResponse)
+async def delete_history_items(
+    payload: BulkDeleteRequest,
+    token_data: dict = Depends(verify_token),
+) -> BulkDeleteResponse:
+    """Delete one or more uploads plus their linked executions for the current user."""
+    user_id = token_data.get("sub")
+    upload_ids = [upload_id.strip() for upload_id in payload.upload_ids if upload_id and upload_id.strip()]
+    if not upload_ids:
+        raise HTTPException(status_code=400, detail="No upload IDs provided")
+
+    try:
+        deleted_ids = await delete_uploads(upload_ids=upload_ids, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not delete uploads: {exc}")
+
+    return BulkDeleteResponse(
+        deleted_count=len(deleted_ids),
+        upload_ids=deleted_ids,
+    )
 
 
 @router.get("/models")

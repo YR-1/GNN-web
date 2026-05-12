@@ -21,6 +21,8 @@ Current scaler artifacts:
 
 - `scalers/listsort_ageadj_target_scaler.json`
 - `scalers/listsort_ageadj_target_scaler.joblib`
+- `scalers/picseq_target_scaler.json`
+- `scalers/picseq_target_scaler.joblib`
 
 ## Environment Variables
 

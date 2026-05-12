@@ -52,6 +52,21 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     accentColor: '#3b82f6',
   },
   {
+    id: 'picseq',
+    name: 'PicSeq (Picture Sequence Memory)',
+    shortName: 'PicSeq',
+    category: 'cognition',
+    description: 'NIH Toolbox Picture Sequence Memory episodic memory score.',
+    relevantROIs: [
+      ...range(1, 22), ...range(135, 156),
+      ...range(63, 82), ...range(197, 216),
+      ...range(101, 110), ...range(235, 244),
+    ],
+    scoreRange: [50, 150],
+    unit: 'AgeAdj',
+    accentColor: '#0f766e',
+  },
+  {
     id: 'sustained_attention',
     name: 'Sustained Attention',
     shortName: 'Attention',

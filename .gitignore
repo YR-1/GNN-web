@@ -24,7 +24,6 @@ backend/ENV/
 backend/.venv
 backend/.env
 backend/.env.*.local
-backend/models/*.pt
 
 # IDE
 .vscode/

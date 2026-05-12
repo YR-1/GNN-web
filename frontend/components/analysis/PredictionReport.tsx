@@ -6,6 +6,7 @@ import { AnalysisResponse, CorrelationResults } from '@/lib/types'
 import { SCORE_REGISTRY } from '@/lib/score-registry'
 import { simulateScore, SimulatedScoreResult } from '@/lib/score-simulator'
 import { BoldTimeSeries } from '@/components/charts/BoldTimeSeries'
+import { API_BASE_URL } from '@/lib/api'
 
 const BrainVisualizationPanel = dynamic(() => import('@/components/BrainVisualizationPanel'), { ssr: false })
 const StaticBrainViews = dynamic(() => import('@/components/StaticBrainViews'), { ssr: false })
@@ -20,6 +21,8 @@ const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix')
 })
 
 const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
+const LISTSORT_IMPORTANCE_BRAIN_PATH = '/static/brain_plots/listsort_importance_3d.html'
+const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_importance_4panel.png'
 
 interface PredictionReportProps {
   analysis: AnalysisResponse
@@ -46,6 +49,12 @@ function toCanonicalScoreId(value: string): string {
 
   const normalizedId = normalizeScoreId(value)
   return alias[normalizedId] ?? normalizedId
+}
+
+function toBackendUrl(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
+  return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
 export function PredictionReport({
@@ -175,6 +184,7 @@ export function PredictionReport({
           predictedValues={predictedValues}
           correlationMatrix={results.correlation_matrix}
           connectomeHtml={results.nilearn_connectome_html}
+          listsortImportanceBrainUrl={toBackendUrl(results.listsort_importance_brain_url ?? LISTSORT_IMPORTANCE_BRAIN_PATH)}
           selectedScoreId={selectedScoreId}
           onSelectScore={setSelectedScoreId}
         />
@@ -183,6 +193,10 @@ export function PredictionReport({
 
         <StaticBrainViews
           markersPngBase64={results.nilearn_markers_png_base64}
+          listsortStaticBrainUrl={toBackendUrl(
+            results.listsort_importance_static_brain_url ?? LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH
+          )}
+          showListSortStaticBrain={selectedScore?.id === PRIMARY_VISUAL_SCORE_ID}
           scoreShortName={selectedScore?.shortName ?? ''}
         />
       </div>

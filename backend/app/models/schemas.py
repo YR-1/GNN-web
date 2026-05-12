@@ -80,6 +80,17 @@ class UploadContentResponse(BaseModel):
     lines_returned: int
 
 
+class BulkDeleteRequest(BaseModel):
+    """Schema for bulk upload deletion."""
+    upload_ids: List[str]
+
+
+class BulkDeleteResponse(BaseModel):
+    """Schema for bulk upload deletion response."""
+    deleted_count: int
+    upload_ids: List[str]
+
+
 class DashboardStats(BaseModel):
     """Schema for dashboard statistics."""
     total_uploads: int

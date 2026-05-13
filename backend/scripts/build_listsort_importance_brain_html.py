@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build cached global ListSort FBNetGen brain importance visualisations."""
+"""Build cached global score-model brain importance visualisations."""
 
 from __future__ import annotations
 
@@ -423,8 +423,14 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
     return top_nodes, edge_plot, len(importance_nodes)
 
 
-def build_static_4panel_png(nodes_json: Path, importance_json: Path, output: Path) -> None:
-    """Render the 4-panel anatomical ListSort importance PNG used by the website."""
+def build_static_4panel_png(
+    nodes_json: Path,
+    importance_json: Path,
+    output: Path,
+    *,
+    plot_title: str,
+) -> None:
+    """Render the 4-panel anatomical importance PNG used by the website."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -475,7 +481,7 @@ def build_static_4panel_png(nodes_json: Path, importance_json: Path, output: Pat
             edge_kwargs={"linewidth": 1.7, "alpha": 0.72},
             display_mode="lyrz",
             colorbar=False,
-            title=f"ListSort FBNetGen importance: top {len(top_nodes)} nodes, top {len(edge_plot)} edges",
+            title=f"{plot_title}: top {len(top_nodes)} nodes, top {len(edge_plot)} edges",
             figure=fig,
             axes=(0.02, 0.08, 0.84, 0.84),
         )
@@ -513,7 +519,7 @@ def build_static_4panel_png(nodes_json: Path, importance_json: Path, output: Pat
             node_size=0,
             display_mode="lyrz",
             colorbar=False,
-            title=f"ListSort FBNetGen importance: top {len(top_nodes)} nodes",
+            title=f"{plot_title}: top {len(top_nodes)} nodes",
             figure=fig,
             axes=(0.02, 0.08, 0.84, 0.84),
         )
@@ -556,6 +562,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--importance-json", type=Path, default=DEFAULT_IMPORTANCE_JSON)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--static-output", type=Path, default=DEFAULT_STATIC_OUTPUT)
+    parser.add_argument("--plot-title", default="ListSort FBNetGen importance")
     parser.add_argument(
         "--include-plotlyjs",
         default="cdn",
@@ -576,6 +583,7 @@ def main() -> None:
         include_plotlyjs = False
     else:
         include_plotlyjs = args.include_plotlyjs
+<<<<<<< HEAD
     fig.write_html(
         str(args.output),
         include_plotlyjs=include_plotlyjs,
@@ -593,6 +601,17 @@ def main() -> None:
     print(f"Saved cached ListSort importance brain: {args.output}")
     build_static_4panel_png(args.nodes_json, args.importance_json, args.static_output)
     print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")
+=======
+    fig.write_html(str(args.output), include_plotlyjs=include_plotlyjs)
+    print(f"Saved cached importance brain: {args.output}")
+    build_static_4panel_png(
+        args.nodes_json,
+        args.importance_json,
+        args.static_output,
+        plot_title=args.plot_title,
+    )
+    print(f"Saved cached static 4-panel brain: {args.static_output}")
+>>>>>>> main
 
 
 if __name__ == "__main__":

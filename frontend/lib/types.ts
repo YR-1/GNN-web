@@ -90,6 +90,8 @@ export interface CorrelationResults {
   file_size: number
   file_name: string
   nilearn_connectome_html?: string | null
+  importance_brain_urls?: Record<string, string>
+  importance_static_brain_urls?: Record<string, string>
   listsort_importance_brain_url?: string | null
   listsort_importance_static_brain_url?: string | null
   top_links?: ConnectomeLink[]

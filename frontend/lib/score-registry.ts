@@ -82,11 +82,11 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     accentColor: '#8b5cf6',
   },
   {
-    id: 'emotion_recognition',
-    name: 'Emotion Recognition',
+    id: 'emotsupp_unadj',
+    name: 'Emotion Support',
     shortName: 'Emotion',
     category: 'emotion',
-    description: 'Ability to identify emotional expressions in faces.',
+    description: 'Ability to receive emotional support from others.',
     relevantROIs: [
       ...range(101, 110), ...range(235, 244),
       ...range(63, 82), ...range(197, 216),

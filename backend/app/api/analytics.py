@@ -44,7 +44,7 @@ MODEL_PERFORMANCE_SEEDS = [
     ("fluid_iq", "Fluid Intelligence", 0.844, 0.00073, 3.71, 2.4),
     ("attention", "Sustained Attention", 0.806, 0.00124, 4.09, 3.1),
     ("processing_speed", "Processing Speed", 0.793, 0.00192, 4.42, 4.7),
-    ("emotion", "Emotion Recognition", 0.769, 0.00215, 4.85, 5.4),
+    ("emotion", "Emotion Support", 0.769, 0.00215, 4.85, 5.4),
     ("executive", "Executive Function", 0.747, 0.00301, 5.13, 6.2),
     ("language", "Language Fluency", 0.701, 0.00388, 5.62, 7.6),
     ("social", "Social Cognition", 0.662, 0.00462, 6.02, 8.8),

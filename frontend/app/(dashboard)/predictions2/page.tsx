@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Activity, ChartNoAxesColumn } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
@@ -118,12 +118,6 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
   sleep_quality: '#f97316',
 }
 
-const BRAIN_DOWNLOAD_BUTTON_STYLE = {
-  backgroundColor: '#949bad',
-  borderColor: '#949bad',
-  color: '#ffffff',
-} as const
-
 export default function Predictions2Page() {
   const router = useRouter()
   const activeAnalysis = useAnalysisStore((state) => state.active_analysis)
@@ -135,7 +129,6 @@ export default function Predictions2Page() {
   const [error, setError] = useState('')
   const [selectedScoreId, setSelectedScoreId] = useState<string | null>(PRIMARY_VISUAL_SCORE_ID)
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
-  const brainIframeRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -280,136 +273,6 @@ export default function Predictions2Page() {
     ? 'Global ListSort FBNetGen importance brain'
     : '3D Brain Connectivity Map'
 
-  const getBrainPlotContext = () => {
-    const iframe = brainIframeRef.current
-    const win = iframe?.contentWindow as
-      | (Window & typeof globalThis & { Plotly?: any })
-      | null
-      | undefined
-    const doc = iframe?.contentDocument
-    const plotEl = doc?.querySelector('.plotly-graph-div') as
-      | (HTMLDivElement & {
-          data?: unknown[]
-          layout?: {
-            scene?: {
-              camera?: {
-                eye?: { x?: number; y?: number; z?: number }
-              }
-            }
-          }
-        })
-      | null
-
-    if (!iframe || !win?.Plotly || !plotEl) return null
-    return { Plotly: win.Plotly, plotEl }
-  }
-
-  const setBrainDragMode = (mode: 'zoom' | 'pan' | 'orbit') => {
-    const context = getBrainPlotContext()
-    if (!context) return
-    context.Plotly.relayout(context.plotEl, { dragmode: mode }).catch((error: unknown) => {
-      console.error('Error switching brain drag mode:', error)
-    })
-  }
-
-  const zoomBrainBy = (factor: number) => {
-    const context = getBrainPlotContext()
-    const eye = context?.plotEl.layout?.scene?.camera?.eye
-    if (!context || !eye) {
-      return
-    }
-
-    context.Plotly.relayout(context.plotEl, {
-      'scene.camera.eye': {
-        x: (eye.x ?? 1) * factor,
-        y: (eye.y ?? 1) * factor,
-        z: (eye.z ?? 0.8) * factor,
-      },
-    }).catch((error: unknown) => {
-      console.error('Error applying brain zoom:', error)
-    })
-  }
-
-  const resetBrainView = () => {
-    const context = getBrainPlotContext()
-    if (!context) return
-    context.Plotly.relayout(context.plotEl, {
-      dragmode: 'orbit',
-      'scene.camera.eye': { x: 1, y: 1, z: 0.8 },
-    }).catch((error: unknown) => {
-      console.error('Error resetting brain view:', error)
-    })
-  }
-
-  const downloadBrainAsPNG = () => {
-    const context = getBrainPlotContext()
-    if (!context) return
-    context.Plotly.downloadImage(context.plotEl, {
-      format: 'png',
-      filename: `brain_visual_${Date.now()}`,
-    }).catch((error: unknown) => {
-      console.error('Error exporting brain PNG:', error)
-    })
-  }
-
-  const downloadBrainAsJSON = () => {
-    const context = getBrainPlotContext()
-    if (!context) return
-    const payload = JSON.stringify(
-      {
-        data: context.plotEl.data ?? [],
-        layout: context.plotEl.layout ?? {},
-      },
-      null,
-      2
-    )
-    const blob = new Blob([payload], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `brain_visual_${Date.now()}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const downloadBrainAsCSV = () => {
-    const context = getBrainPlotContext()
-    if (!context) return
-
-    const rows = (context.plotEl.data ?? []).flatMap((trace: any, traceIndex: number) => {
-      const xValues = Array.isArray(trace?.x) ? trace.x : []
-      const yValues = Array.isArray(trace?.y) ? trace.y : []
-      const zValues = Array.isArray(trace?.z) ? trace.z : []
-      const colors = Array.isArray(trace?.marker?.color) ? trace.marker.color : []
-      const labels = Array.isArray(trace?.text) ? trace.text : []
-      const rowCount = Math.max(xValues.length, yValues.length, zValues.length, colors.length, labels.length, 1)
-
-      return Array.from({ length: rowCount }, (_, pointIndex) => [
-        traceIndex,
-        trace?.name ?? '',
-        trace?.type ?? '',
-        xValues[pointIndex] ?? '',
-        yValues[pointIndex] ?? '',
-        zValues[pointIndex] ?? '',
-        colors[pointIndex] ?? '',
-        labels[pointIndex] ?? '',
-      ])
-    })
-
-    const csvContent = [
-      ['trace_index', 'trace_name', 'trace_type', 'x', 'y', 'z', 'color', 'label'].join(','),
-      ...rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')),
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `brain_visual_${Date.now()}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   if (error) {
     return (
       <div className='page-container'>
@@ -450,11 +313,11 @@ export default function Predictions2Page() {
   }
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-4'>
       <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
-        <div className='grid h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden p-3'>
-          <section className='px-1 py-1'>
-            <div className='space-y-1'>
+        <div className='grid h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-3'>
+          <section className='px-1 py-0'>
+            <div className='space-y-0.5'>
               <h1 className='font-display text-lg font-semibold text-slate-950'>Predicted Brain Behavior Dashboard</h1>
               <p className='text-sm text-slate-700'>
                 File: <span className='mono-data'>{results.file_name}</span>
@@ -464,14 +327,11 @@ export default function Predictions2Page() {
 
           <section className='min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm'>
             <div className='grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
-              <div className='grid min-h-0 gap-3 xl:grid-rows-[minmax(0,2fr)_minmax(0,1fr)]'>
-                <div className='flex min-h-0 flex-col overflow-hidden rounded-[1.2rem] bg-white'>
-                  <div className='min-h-0 flex-1 overflow-hidden'>
-                    
+              <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
+                <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
                   {showListSortBrain ? (
                     listsortImportanceBrainUrl ? (
                       <iframe
-                        ref={brainIframeRef}
                         title={currentBrainTitle}
                         src={listsortImportanceBrainUrl}
                         className='h-full min-h-[15rem] w-full border-0'
@@ -484,7 +344,6 @@ export default function Predictions2Page() {
                     )
                   ) : results.nilearn_connectome_html ? (
                     <iframe
-                      ref={brainIframeRef}
                       title={currentBrainTitle}
                       srcDoc={results.nilearn_connectome_html}
                       className='h-full min-h-[15rem] w-full border-0'
@@ -496,113 +355,18 @@ export default function Predictions2Page() {
                     </div>
                   )}
                 </div>
-                <div className='border-t border-slate-200 bg-white px-2 py-2'>
-                  <div className='flex items-center justify-between gap-3'>
-                    <div className='flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto'>
-                      <button
-                        type='button'
-                        onClick={() => zoomBrainBy(0.85)}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        Zoom In
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() => zoomBrainBy(1.15)}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        Zoom Out
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() => setBrainDragMode('pan')}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        Pan
-                      </button>
-                      <button
-                        type='button'
-                        disabled
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] opacity-50'
-                        title='Plotly 3D brain view does not support box select.'
-                      >
-                        Box Select
-                      </button>
-                      <button
-                        type='button'
-                        disabled
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] opacity-50'
-                        title='Plotly 3D brain view does not support lasso select.'
-                      >
-                        Lasso
-                      </button>
-                      <button
-                        type='button'
-                        onClick={resetBrainView}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        Home / Reset
-                      </button>
-                      <button
-                        type='button'
-                        onClick={downloadBrainAsPNG}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        PNG
-                      </button>
-                    </div>
 
-                    <div className='flex shrink-0 flex-nowrap gap-1.5'>
-                      <button
-                        type='button'
-                        onClick={downloadBrainAsJSON}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-50'
-                        style={BRAIN_DOWNLOAD_BUTTON_STYLE}
-                      >
-                        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3 w-3' aria-hidden='true'>
-                          <path d='M12 4v9' strokeLinecap='round' />
-                          <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
-                          <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
-                        </svg>
-                        <span>JSON</span>
-                      </button>
-                      <button
-                        type='button'
-                        onClick={downloadBrainAsCSV}
-                        disabled={!showListSortBrain}
-                        className='btn-secondary shrink-0 gap-1 px-1.5 py-0.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-50'
-                        style={BRAIN_DOWNLOAD_BUTTON_STYLE}
-                      >
-                        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3 w-3' aria-hidden='true'>
-                          <path d='M12 4v9' strokeLinecap='round' />
-                          <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
-                          <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
-                        </svg>
-                        <span>CSV</span>
-                      </button>
-                    </div>
+                <section className='overflow-hidden rounded-[1.2rem] bg-white'>
+                  <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
+                    <StaticBrainViews
+                      markersPngBase64={results.nilearn_markers_png_base64}
+                      listsortStaticBrainUrl={listsortStaticBrainUrl}
+                      showListSortStaticBrain={showListSortBrain}
+                      scoreShortName={selectedScore?.shortName ?? 'Selected score'}
+                    />
                   </div>
-                </div>
+                </section>
               </div>
-
-              <section className='overflow-hidden rounded-[1.2rem] bg-white'>
-                <div className='overflow-hidden [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.surface-card>div:first-child]:hidden [&_.border-t]:hidden [&_img]:mx-auto [&_img]:max-h-[8.5rem] [&_img]:w-full [&_img]:object-contain'>
-                  <StaticBrainViews
-                    markersPngBase64={results.nilearn_markers_png_base64}
-                    listsortStaticBrainUrl={listsortStaticBrainUrl}
-                    showListSortStaticBrain={showListSortBrain}
-                    scoreShortName={selectedScore?.shortName ?? 'Selected score'}
-                  />
-                </div>
-              </section>
-            </div>
-
             <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-3'>
                 <div className='mb-3 flex items-center justify-between gap-3'>
                   <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
@@ -655,7 +419,7 @@ export default function Predictions2Page() {
                     )
                   })}
                 </div>
-              </div>
+            </div>
             </div>
           </section>
         </div>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, Brain, ChartNoAxesColumn, HeartPulse } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, API_BASE_URL } from '@/lib/api'
 import { computeScoreTopLinks } from '@/lib/score-links'
 import { getROILabel } from '@/lib/shen268-labels'
 import { getScoresByCategory, SCORE_REGISTRY, type ScoreCategory, type ScoreDefinition } from '@/lib/score-registry'
@@ -21,6 +21,8 @@ const BoldTimeSeries = dynamic(
 )
 
 const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
+const LISTSORT_IMPORTANCE_BRAIN_PATH = '/static/brain_plots/listsort_importance_3d.html'
+const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_importance_4panel.png'
 
 function normalizeScoreId(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -43,11 +45,33 @@ function toCanonicalScoreId(value: string): string {
   return alias[normalizedId] ?? normalizedId
 }
 
+function toBackendUrl(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
+  return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
+}
+
 function formatValue(value: number, scoreDef: ScoreDefinition): string {
   const range = scoreDef.scoreRange[1] - scoreDef.scoreRange[0]
   if (range <= 1) return value.toFixed(2)
   if (range <= 30) return value.toFixed(1)
   return Math.round(value).toString()
+}
+
+function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueScale?: string): string {
+  if (valueScale === 'normalized') return value.toFixed(3)
+  return formatValue(value, scoreDef)
+}
+
+function formatPredictionUnit(scoreDef: ScoreDefinition, valueScale?: string): string {
+  if (valueScale === 'normalized') return 'normalized'
+  return scoreDef.unit
+}
+
+function sourceBadgeClass(source?: string): string {
+  return source === 'model'
+    ? 'bg-emerald-100 text-emerald-800 border-emerald-300/80'
+    : 'bg-amber-100 text-amber-800 border-amber-300/80'
 }
 
 function scorePercent(value: number, scoreDef: ScoreDefinition): number {
@@ -265,7 +289,18 @@ export default function Predictions2Page() {
       const ci95Lower = Number.isFinite(prediction.ci95_lower as number) ? Number(prediction.ci95_lower) : value
       const ci95Upper = Number.isFinite(prediction.ci95_upper as number) ? Number(prediction.ci95_upper) : value
 
-      byId[normalizedId] = { value, ci95Lower, ci95Upper }
+      byId[normalizedId] = {
+        value,
+        ci95Lower,
+        ci95Upper,
+        source: 'model',
+        modelFile: prediction.model_file,
+        modelArchitecture: prediction.model_architecture,
+        nGraphWindows: prediction.n_graph_windows,
+        valueScale: prediction.value_scale,
+        normalizedValue: prediction.normalized_value,
+        targetScaler: prediction.target_scaler,
+      }
     }
 
     return byId
@@ -292,7 +327,10 @@ export default function Predictions2Page() {
         continue
       }
 
-      values[score.id] = simulateScore(score, results.correlation_matrix)
+      values[score.id] = {
+        ...simulateScore(score, results.correlation_matrix),
+        source: 'simulated',
+      }
     }
 
     return values
@@ -308,6 +346,11 @@ export default function Predictions2Page() {
   )
 
   const selectedScoreResult = selectedScore ? predictedValues[selectedScore.id] : null
+  const showListSortBrain = selectedScore?.id === PRIMARY_VISUAL_SCORE_ID
+  const listsortImportanceBrainUrl = toBackendUrl(results?.listsort_importance_brain_url ?? LISTSORT_IMPORTANCE_BRAIN_PATH)
+  const listsortStaticBrainUrl = toBackendUrl(
+    results?.listsort_importance_static_brain_url ?? LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH
+  )
 
   const focusedTimeSeries = useMemo(
     () => buildFocusedTimeSeries(results?.time_series, results, selectedScore?.id ?? ''),
@@ -410,18 +453,46 @@ export default function Predictions2Page() {
               </p>
             </div>
             {selectedScore && selectedScoreResult ? (
-              <div className='rounded-2xl border border-brand-400/20 bg-white/90 px-4 py-3 text-right shadow-sm'>
-                <p className='text-xs uppercase tracking-[0.12em] text-ink-700'>Focused Metric</p>
+              <div className='rounded-2xl border border-brand-400/20 bg-white/90 px-4 py-3 shadow-sm'>
+                <p className='text-xs uppercase tracking-[0.12em] text-ink-700'>Predicted Score</p>
                 <p className='font-semibold text-ink-950'>{selectedScore.name}</p>
-                <p className='text-lg font-semibold' style={{ color: selectedScore.accentColor }}>
-                  {formatValue(selectedScoreResult.value, selectedScore)} {selectedScore.unit}
-                </p>
+                <div className='mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-600'>
+                  <span className={`rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide ${sourceBadgeClass(selectedScoreResult.source)}`}>
+                    {selectedScoreResult.source === 'model' ? 'Model prediction' : 'Simulated fallback'}
+                  </span>
+                  {selectedScoreResult.modelArchitecture && <span>Architecture: {selectedScoreResult.modelArchitecture}</span>}
+                  {selectedScoreResult.nGraphWindows && <span>Windows: {selectedScoreResult.nGraphWindows}</span>}
+                </div>
+                <div className='mt-2 text-right'>
+                  <p className='text-lg font-semibold' style={{ color: selectedScore.accentColor }}>
+                    {formatPredictionValue(selectedScoreResult.value, selectedScore, selectedScoreResult.valueScale)}{' '}
+                    {formatPredictionUnit(selectedScore, selectedScoreResult.valueScale)}
+                  </p>
+                  <p className='text-xs text-ink-700'>
+                    95% CI: {formatPredictionValue(selectedScoreResult.ci95Lower, selectedScore, selectedScoreResult.valueScale)} -{' '}
+                    {formatPredictionValue(selectedScoreResult.ci95Upper, selectedScore, selectedScoreResult.valueScale)}
+                  </p>
+                </div>
               </div>
             ) : null}
           </div>
 
           <div className='overflow-hidden rounded-[1.75rem] border border-brand-400/20 bg-white/85 shadow-inner'>
-            {results.nilearn_connectome_html ? (
+            {showListSortBrain ? (
+              listsortImportanceBrainUrl ? (
+                <iframe
+                  title='Global ListSort FBNetGen importance brain'
+                  src={listsortImportanceBrainUrl}
+                  className='w-full border-0'
+                  style={{ height: '540px' }}
+                  sandbox='allow-scripts allow-same-origin'
+                />
+              ) : (
+                <div className='flex h-[540px] items-center justify-center text-sm text-ink-700'>
+                  ListSort importance brain is not available for this run.
+                </div>
+              )
+            ) : results.nilearn_connectome_html ? (
               <iframe
                 title='3D Brain Connectivity Map'
                 srcDoc={results.nilearn_connectome_html}
@@ -506,6 +577,8 @@ export default function Predictions2Page() {
         </div>
         <StaticBrainViews
           markersPngBase64={results.nilearn_markers_png_base64}
+          listsortStaticBrainUrl={listsortStaticBrainUrl}
+          showListSortStaticBrain={showListSortBrain}
           scoreShortName={selectedScore?.shortName ?? 'Selected score'}
         />
       </section>

@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ChartNoAxesColumn } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
 import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
@@ -60,6 +60,11 @@ function formatValue(value: number, scoreDef: ScoreDefinition): string {
 function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueScale?: string): string {
   if (valueScale === 'normalized') return value.toFixed(3)
   return formatValue(value, scoreDef)
+}
+
+function formatRangeLabel(scoreDef: ScoreDefinition): string {
+  const [min, max] = scoreDef.scoreRange
+  return `Range: ${formatValue(min, scoreDef)} - ${formatValue(max, scoreDef)}`
 }
 
 function scorePercent(value: number, scoreDef: ScoreDefinition): number {
@@ -255,6 +260,8 @@ export default function Predictions2Page() {
   const metricScores = SCORE_REGISTRY.filter((score) =>
     ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotion_recognition', 'sleep_quality'].includes(score.id)
   )
+  const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
+  const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
   const focusedTimeSeries = useMemo(
     () => buildFocusedTimeSeries(results?.time_series, results, selectedScore?.id ?? ''),
@@ -378,46 +385,71 @@ export default function Predictions2Page() {
                   ) : null}
                 </div>
 
-                <div className='flex-1 space-y-3'>
-                  {metricScores.map((score) => {
-                    const result = predictedValues[score.id]
-                    const percent = result ? scorePercent(result.value, score) : 0
-                    const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
+                <div className='flex-1 space-y-4'>
+                  {[
+                    { id: 'cognition', label: 'Cognition Metrics', scores: cognitionMetricScores },
+                    { id: 'emotion', label: 'Emotion Metrics', scores: emotionMetricScores },
+                  ].map((group) => (
+                    <div key={group.id} className='space-y-2'>
+                      <div className='px-1'>
+                        <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400'>
+                          {group.label}
+                        </p>
+                      </div>
 
-                    return (
-                      <button
-                        key={score.id}
-                        type='button'
-                        onClick={() => setSelectedScoreId(score.id)}
-                        className={`w-full rounded-[1rem] border px-3 py-2.5 text-left transition ${
-                          selectedScore?.id === score.id
-                            ? 'border-slate-300 bg-slate-50 shadow-sm'
-                            : 'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className='mb-1.5 flex items-end justify-between gap-3'>
-                          <div className='min-w-0'>
-                            <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
-                            <p className='text-[10px] text-slate-500'>{score.unit}</p>
-                          </div>
-                          <div className='shrink-0 text-right'>
-                            <p className='text-lg font-semibold' style={{ color: accent }}>
-                              {result ? formatPredictionValue(result.value, score, result.valueScale) : '--'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className='h-2 overflow-hidden rounded-full bg-slate-100'>
-                          <div
-                            className='h-full rounded-full transition-all'
-                            style={{
-                              width: `${percent}%`,
-                              background: `linear-gradient(90deg, ${accent}, ${accent}CC)`,
-                            }}
-                          />
-                        </div>
-                      </button>
-                    )
-                  })}
+                      <div className='space-y-3'>
+                        {group.scores.map((score) => {
+                          const result = predictedValues[score.id]
+                          const percent = result ? scorePercent(result.value, score) : 0
+                          const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
+
+                          return (
+                            <button
+                              key={score.id}
+                              type='button'
+                              onClick={() => setSelectedScoreId(score.id)}
+                              className={`w-full rounded-[1rem] border px-3 py-2.5 text-left transition ${
+                                selectedScore?.id === score.id
+                                  ? 'border-slate-300 bg-slate-50 shadow-sm'
+                                  : 'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className='mb-1.5 flex items-start justify-between gap-3'>
+                                <div className='min-w-0'>
+                                  <div className='flex items-center gap-1.5'>
+                                    <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
+                                    <span
+                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
+                                      title={score.description}
+                                      aria-label={`${score.name} info`}
+                                    >
+                                      <Info className='h-2.5 w-2.5' />
+                                    </span>
+                                  </div>
+                                  <p className='text-[10px] text-slate-500'>{score.unit}</p>
+                                  <p className='text-[10px] text-slate-400'>{formatRangeLabel(score)}</p>
+                                </div>
+                                <div className='shrink-0 pt-0.5 text-right'>
+                                  <p className='text-lg font-semibold' style={{ color: accent }}>
+                                    {result ? formatPredictionValue(result.value, score, result.valueScale) : '--'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className='h-2 overflow-hidden rounded-full bg-slate-100'>
+                                <div
+                                  className='h-full rounded-full transition-all'
+                                  style={{
+                                    width: `${percent}%`,
+                                    background: `linear-gradient(90deg, ${accent}, ${accent}CC)`,
+                                  }}
+                                />
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
             </div>
             </div>
@@ -425,43 +457,41 @@ export default function Predictions2Page() {
         </div>
       </section>
 
-      <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
-        <div className='flex h-full flex-col space-y-4'>
-          <div className='flex items-center gap-3'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-              <ChartNoAxesColumn className='h-5 w-5' />
+      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
+        <div className='p-3'>
+          <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
+            <div className='flex h-full flex-col space-y-4'>
+              <div>
+                <div>
+                  <h2 className='font-display text-lg font-semibold text-slate-950'>Correlation Matrix</h2>
+                  <p className='text-sm text-slate-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
+                </div>
+              </div>
+              <CorrelationMatrix
+                data={results}
+                fileName={results.file_name}
+                title=''
+                subtitle=''
+              />
             </div>
-            <div>
-              <h2 className='font-display text-2xl text-ink-950'>Correlation Matrix</h2>
-              <p className='text-sm text-ink-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
-            </div>
-          </div>
-          <CorrelationMatrix
-            data={results}
-            fileName={results.file_name}
-            title=''
-            subtitle=''
-          />
-        </div>
 
-        <div className='flex h-full flex-col space-y-4'>
-          <div className='flex items-center gap-3'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-              <Activity className='h-5 w-5' />
+            <div className='flex h-full flex-col space-y-4'>
+              <div>
+                <div>
+                  <h2 className='font-display text-lg font-semibold text-slate-950'>Time Series Graph</h2>
+                  <p className='text-sm text-slate-700'>
+                    Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
+                  </p>
+                </div>
+              </div>
+              <BoldTimeSeries
+                timeSeries={focusedTimeSeries}
+                highlightedTrIndex={currentTrValue ?? null}
+                title=''
+                subtitle=''
+              />
             </div>
-            <div>
-              <h2 className='font-display text-2xl text-ink-950'>Time Series Graph</h2>
-              <p className='text-sm text-ink-700'>
-                Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
-              </p>
-            </div>
-          </div>
-          <BoldTimeSeries
-            timeSeries={focusedTimeSeries}
-            highlightedTrIndex={currentTrValue ?? null}
-            title=''
-            subtitle=''
-          />
+          </section>
         </div>
       </section>
     </div>

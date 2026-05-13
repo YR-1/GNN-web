@@ -24,6 +24,20 @@ export default function CorrelationMatrix({
     color: '#ffffff',
   } as const
 
+  const getCurrentRanges = () => {
+    const plotEl = plotRef.current as unknown as {
+      _fullLayout?: {
+        xaxis?: { range?: [number, number] }
+        yaxis?: { range?: [number, number] }
+      }
+    } | null
+
+    return {
+      xRange: plotEl?._fullLayout?.xaxis?.range,
+      yRange: plotEl?._fullLayout?.yaxis?.range,
+    }
+  }
+
   useEffect(() => {
     if (!plotRef.current) return
 
@@ -67,7 +81,7 @@ export default function CorrelationMatrix({
           range: [0, 268],
           autorange: false,
           constrain: 'domain',
-          fixedrange: true,
+          fixedrange: false,
         },
         yaxis: {
           ...baseYaxis,
@@ -76,7 +90,7 @@ export default function CorrelationMatrix({
           scaleanchor: 'x',
           scaleratio: 1,
           constrain: 'domain',
-          fixedrange: true,
+          fixedrange: false,
         },
       }
 
@@ -154,6 +168,7 @@ export default function CorrelationMatrix({
       'yaxis.range': [0, 268],
       'yaxis.autorange': false,
       dragmode: 'zoom',
+      selections: [],
     }).catch((error: unknown) => {
       console.error('Error resetting plot view:', error)
     })
@@ -161,11 +176,7 @@ export default function CorrelationMatrix({
 
   const zoomBy = (factor: number) => {
     if (!plotRef.current || !plotlyRef.current) return
-    const plotEl = plotRef.current as unknown as {
-      layout?: { xaxis?: { range?: [number, number] }; yaxis?: { range?: [number, number] } }
-    }
-    const xRange = plotEl.layout?.xaxis?.range
-    const yRange = plotEl.layout?.yaxis?.range
+    const { xRange, yRange } = getCurrentRanges()
     if (!xRange || !yRange) {
       resetView()
       return

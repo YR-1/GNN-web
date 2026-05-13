@@ -4,11 +4,10 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Brain, ChartNoAxesColumn, HeartPulse } from 'lucide-react'
-import { api } from '@/lib/api'
-import { computeScoreTopLinks } from '@/lib/score-links'
+import { Info } from 'lucide-react'
+import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
-import { getScoresByCategory, SCORE_REGISTRY, type ScoreCategory, type ScoreDefinition } from '@/lib/score-registry'
+import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
 import { simulateScore, type SimulatedScoreResult } from '@/lib/score-simulator'
 import type { AnalysisResponse, CorrelationResults, ExplainedScore, HistoryItem, TimeSeriesPayload } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
@@ -21,6 +20,8 @@ const BoldTimeSeries = dynamic(
 )
 
 const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
+const LISTSORT_IMPORTANCE_BRAIN_PATH = '/static/brain_plots/listsort_importance_3d.html'
+const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_importance_4panel.png'
 
 function normalizeScoreId(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -43,6 +44,12 @@ function toCanonicalScoreId(value: string): string {
   return alias[normalizedId] ?? normalizedId
 }
 
+function toBackendUrl(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
+  return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
+}
+
 function formatValue(value: number, scoreDef: ScoreDefinition): string {
   const range = scoreDef.scoreRange[1] - scoreDef.scoreRange[0]
   if (range <= 1) return value.toFixed(2)
@@ -50,14 +57,20 @@ function formatValue(value: number, scoreDef: ScoreDefinition): string {
   return Math.round(value).toString()
 }
 
+function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueScale?: string): string {
+  if (valueScale === 'normalized') return value.toFixed(3)
+  return formatValue(value, scoreDef)
+}
+
+function formatRangeLabel(scoreDef: ScoreDefinition): string {
+  const [min, max] = scoreDef.scoreRange
+  return `Range: ${formatValue(min, scoreDef)} - ${formatValue(max, scoreDef)}`
+}
+
 function scorePercent(value: number, scoreDef: ScoreDefinition): number {
   const [min, max] = scoreDef.scoreRange
   if (max <= min) return 0
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))
-}
-
-function formatScoreRange(scoreDef: ScoreDefinition): string {
-  return `${formatValue(scoreDef.scoreRange[0], scoreDef)} - ${formatValue(scoreDef.scoreRange[1], scoreDef)} ${scoreDef.unit}`
 }
 
 function getExplainedScore(results: CorrelationResults | undefined, scoreId: string): ExplainedScore | undefined {
@@ -102,95 +115,12 @@ function buildFocusedTimeSeries(
   }
 }
 
-function ScoreCategoryCard({
-  category,
-  selectedScoreId,
-  predictedValues,
-  onSelect,
-}: {
-  category: ScoreCategory
-  selectedScoreId: string | null
-  predictedValues: Record<string, SimulatedScoreResult>
-  onSelect: (scoreId: string) => void
-}) {
-  const scores = getScoresByCategory(category)
-  const icon = category === 'cognition' ? Brain : HeartPulse
-  const title = category === 'cognition' ? 'Cognition' : 'Emotion'
-  const Icon = icon
-
-  return (
-    <div className='surface-card-strong space-y-4'>
-      <div className='flex items-center gap-3'>
-        <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-          <Icon className='h-5 w-5' />
-        </div>
-        <div>
-          <h2 className='font-display text-lg font-semibold text-ink-950'>{title}</h2>
-          <p className='text-xs text-ink-700'>Model-derived behavioral profile</p>
-        </div>
-      </div>
-
-      <div className='space-y-3'>
-        {scores.map((scoreDef) => {
-          const result = predictedValues[scoreDef.id]
-          const active = selectedScoreId === scoreDef.id
-          const percent = result ? scorePercent(result.value, scoreDef) : 0
-
-          return (
-            <button
-              key={scoreDef.id}
-              type='button'
-              onClick={() => onSelect(scoreDef.id)}
-              className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                active
-                  ? 'border-brand-500/40 bg-white shadow-sm'
-                  : 'border-brand-400/15 bg-white/70 hover:border-brand-500/30 hover:bg-white/90'
-              }`}
-            >
-              <div className='flex items-start justify-between gap-3'>
-                <div>
-                  <p className='text-sm font-semibold text-ink-950'>{scoreDef.name}</p>
-                  <p className='text-[11px] text-ink-700'>Score range: {formatScoreRange(scoreDef)}</p>
-                </div>
-                <div className='text-right'>
-                  {result ? (
-                    <>
-                      <p className='text-[10px] uppercase tracking-[0.08em] text-ink-700'>Predicted score</p>
-                      <p className='text-lg font-semibold' style={{ color: scoreDef.accentColor }}>
-                        {formatValue(result.value, scoreDef)}
-                      </p>
-                      <p className='text-[11px] text-ink-700'>{Math.round(percent)}%</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className='text-sm font-semibold text-ink-700'>Unavailable</p>
-                      <p className='text-[11px] text-ink-700'>No prediction</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className='mt-2 flex items-center justify-between gap-3 text-[11px] text-ink-700'>
-                <span>{scoreDef.unit}</span>
-                <span>
-                  {result
-                    ? `Predicted range (95% CI): ${formatValue(result.ci95Lower, scoreDef)} - ${formatValue(result.ci95Upper, scoreDef)}`
-                    : 'Prediction range unavailable'}
-                </span>
-              </div>
-
-              <div className='mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200'>
-                <div
-                  className='h-full rounded-full transition-all'
-                  style={{ width: `${percent}%`, background: scoreDef.accentColor }}
-                />
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
+const METRIC_BAR_ACCENTS: Record<string, string> = {
+  listsort_ageadj: '#7c3aed',
+  pmat: '#a855f7',
+  sustained_attention: '#ec4899',
+  emotion_recognition: '#ef4444',
+  sleep_quality: '#f97316',
 }
 
 export default function Predictions2Page() {
@@ -265,7 +195,18 @@ export default function Predictions2Page() {
       const ci95Lower = Number.isFinite(prediction.ci95_lower as number) ? Number(prediction.ci95_lower) : value
       const ci95Upper = Number.isFinite(prediction.ci95_upper as number) ? Number(prediction.ci95_upper) : value
 
-      byId[normalizedId] = { value, ci95Lower, ci95Upper }
+      byId[normalizedId] = {
+        value,
+        ci95Lower,
+        ci95Upper,
+        source: 'model',
+        modelFile: prediction.model_file,
+        modelArchitecture: prediction.model_architecture,
+        nGraphWindows: prediction.n_graph_windows,
+        valueScale: prediction.value_scale,
+        normalizedValue: prediction.normalized_value,
+        targetScaler: prediction.target_scaler,
+      }
     }
 
     return byId
@@ -292,7 +233,10 @@ export default function Predictions2Page() {
         continue
       }
 
-      values[score.id] = simulateScore(score, results.correlation_matrix)
+      values[score.id] = {
+        ...simulateScore(score, results.correlation_matrix),
+        source: 'simulated',
+      }
     }
 
     return values
@@ -308,6 +252,16 @@ export default function Predictions2Page() {
   )
 
   const selectedScoreResult = selectedScore ? predictedValues[selectedScore.id] : null
+  const showListSortBrain = selectedScore?.id === PRIMARY_VISUAL_SCORE_ID
+  const listsortImportanceBrainUrl = toBackendUrl(results?.listsort_importance_brain_url ?? LISTSORT_IMPORTANCE_BRAIN_PATH)
+  const listsortStaticBrainUrl = toBackendUrl(
+    results?.listsort_importance_static_brain_url ?? LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH
+  )
+  const metricScores = SCORE_REGISTRY.filter((score) =>
+    ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotion_recognition', 'sleep_quality'].includes(score.id)
+  )
+  const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
+  const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
   const focusedTimeSeries = useMemo(
     () => buildFocusedTimeSeries(results?.time_series, results, selectedScore?.id ?? ''),
@@ -321,12 +275,10 @@ export default function Predictions2Page() {
   }, [timeSeriesMaxIndex])
 
   const currentTrValue = focusedTimeSeries?.tr_index[currentTrIndex]
-  const currentGlobalSignal = focusedTimeSeries?.global_signal[currentTrIndex] ?? null
 
-  const topConnections = useMemo(() => {
-    if (!results?.correlation_matrix || !selectedScore) return []
-    return computeScoreTopLinks(results.correlation_matrix, selectedScore, 3, 0.2)
-  }, [results?.correlation_matrix, selectedScore])
+  const currentBrainTitle = showListSortBrain
+    ? 'Global ListSort FBNetGen importance brain'
+    : '3D Brain Connectivity Map'
 
   if (error) {
     return (
@@ -368,185 +320,178 @@ export default function Predictions2Page() {
   }
 
   return (
-    <div className='space-y-6'>
-      <section className='surface-card-strong space-y-5'>
-        <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
-          <div className='space-y-2'>
-            <p className='text-xs uppercase tracking-[0.18em] text-brand-700 font-semibold'>Predictions 2</p>
-            <h1 className='font-display text-3xl text-ink-950'>Integrated Brain-Behavior Dashboard</h1>
-            <p className='text-sm text-ink-700'>
-              File name indicator: <span className='mono-data'>{results.file_name}</span>
-            </p>
-            <p className='text-sm text-ink-700'>
-              Visual model link: <span className='font-semibold text-ink-950'>ListSort (Age Adjusted)</span>
-            </p>
-            <p className='text-xs text-ink-700'>
-              Execution ID: <span className='mono-data'>{activeAnalysis.execution_id}</span>
-            </p>
-          </div>
+    <div className='space-y-4'>
+      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
+        <div className='grid h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-3'>
+          <section className='px-1 py-0'>
+            <div className='space-y-0.5'>
+              <h1 className='font-display text-lg font-semibold text-slate-950'>Predicted Brain Behavior Dashboard</h1>
+              <p className='text-sm text-slate-700'>
+                File: <span className='mono-data'>{results.file_name}</span>
+              </p>
+            </div>
+          </section>
 
-          <div className='w-full max-w-md rounded-2xl border border-brand-400/20 bg-white/85 p-4'>
-            <div className='mb-2 flex items-center justify-between text-sm font-semibold text-ink-950'>
-              <span>Processing Status</span>
-              <span className='text-brand-700'>Completed</span>
+          <section className='min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm'>
+            <div className='grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
+              <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
+                <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
+                  {showListSortBrain ? (
+                    listsortImportanceBrainUrl ? (
+                      <iframe
+                        title={currentBrainTitle}
+                        src={listsortImportanceBrainUrl}
+                        className='h-full min-h-[15rem] w-full border-0'
+                        sandbox='allow-scripts allow-same-origin'
+                      />
+                    ) : (
+                      <div className='flex h-full min-h-[15rem] items-center justify-center text-sm text-slate-600'>
+                        3D brain visualization is not available for this run.
+                      </div>
+                    )
+                  ) : results.nilearn_connectome_html ? (
+                    <iframe
+                      title={currentBrainTitle}
+                      srcDoc={results.nilearn_connectome_html}
+                      className='h-full min-h-[15rem] w-full border-0'
+                      sandbox='allow-scripts allow-same-origin'
+                    />
+                  ) : (
+                    <div className='flex h-full min-h-[15rem] items-center justify-center text-sm text-slate-600'>
+                      3D brain visualization is not available for this run.
+                    </div>
+                  )}
+                </div>
+
+                <section className='overflow-hidden rounded-[1.2rem] bg-white'>
+                  <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
+                    <StaticBrainViews
+                      markersPngBase64={results.nilearn_markers_png_base64}
+                      listsortStaticBrainUrl={listsortStaticBrainUrl}
+                      showListSortStaticBrain={showListSortBrain}
+                      scoreShortName={selectedScore?.shortName ?? 'Selected score'}
+                    />
+                  </div>
+                </section>
+              </div>
+            <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-3'>
+                <div className='mb-3 flex items-center justify-between gap-3'>
+                  <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
+                  {selectedScoreResult && selectedScore ? (
+                    <div className='text-right'>
+                      <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
+                      <p className='text-sm font-semibold text-slate-950'>{selectedScore.shortName}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className='flex-1 space-y-4'>
+                  {[
+                    { id: 'cognition', label: 'Cognition Metrics', scores: cognitionMetricScores },
+                    { id: 'emotion', label: 'Emotion Metrics', scores: emotionMetricScores },
+                  ].map((group) => (
+                    <div key={group.id} className='space-y-2'>
+                      <div className='px-1'>
+                        <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400'>
+                          {group.label}
+                        </p>
+                      </div>
+
+                      <div className='space-y-3'>
+                        {group.scores.map((score) => {
+                          const result = predictedValues[score.id]
+                          const percent = result ? scorePercent(result.value, score) : 0
+                          const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
+
+                          return (
+                            <button
+                              key={score.id}
+                              type='button'
+                              onClick={() => setSelectedScoreId(score.id)}
+                              className={`w-full rounded-[1rem] border px-3 py-2.5 text-left transition ${
+                                selectedScore?.id === score.id
+                                  ? 'border-slate-300 bg-slate-50 shadow-sm'
+                                  : 'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className='mb-1.5 flex items-start justify-between gap-3'>
+                                <div className='min-w-0'>
+                                  <div className='flex items-center gap-1.5'>
+                                    <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
+                                    <span
+                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
+                                      title={score.description}
+                                      aria-label={`${score.name} info`}
+                                    >
+                                      <Info className='h-2.5 w-2.5' />
+                                    </span>
+                                  </div>
+                                  <p className='text-[10px] text-slate-500'>{score.unit}</p>
+                                  <p className='text-[10px] text-slate-400'>{formatRangeLabel(score)}</p>
+                                </div>
+                                <div className='shrink-0 pt-0.5 text-right'>
+                                  <p className='text-lg font-semibold' style={{ color: accent }}>
+                                    {result ? formatPredictionValue(result.value, score, result.valueScale) : '--'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className='h-2 overflow-hidden rounded-full bg-slate-100'>
+                                <div
+                                  className='h-full rounded-full transition-all'
+                                  style={{
+                                    width: `${percent}%`,
+                                    background: `linear-gradient(90deg, ${accent}, ${accent}CC)`,
+                                  }}
+                                />
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
             </div>
-            <div className='h-3 overflow-hidden rounded-full bg-slate-200'>
-              <div className='h-full w-full rounded-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700' />
             </div>
-            <p className='mt-2 text-xs text-ink-700'>
-              Analysis outputs are ready for exploration and explanation.
-            </p>
-          </div>
+          </section>
         </div>
       </section>
 
-      <section className='grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_0.9fr]'>
-        <div className='surface-card-strong space-y-5'>
-          <div className='flex items-start justify-between gap-4'>
-            <div>
-              <h2 className='font-display text-2xl text-ink-950'>3D Brain Connectivity Map</h2>
-              <p className='text-sm text-ink-700'>
-                Interactive connectome for the current analysis, linked to the ListSort (Age Adjusted) behavioral model and paired with a playback scrubber across the fMRI time series.
-              </p>
-            </div>
-            {selectedScore && selectedScoreResult ? (
-              <div className='rounded-2xl border border-brand-400/20 bg-white/90 px-4 py-3 text-right shadow-sm'>
-                <p className='text-xs uppercase tracking-[0.12em] text-ink-700'>Focused Metric</p>
-                <p className='font-semibold text-ink-950'>{selectedScore.name}</p>
-                <p className='text-lg font-semibold' style={{ color: selectedScore.accentColor }}>
-                  {formatValue(selectedScoreResult.value, selectedScore)} {selectedScore.unit}
-                </p>
+      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
+        <div className='p-3'>
+          <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
+            <div className='flex h-full flex-col space-y-4'>
+              <div>
+                <div>
+                  <h2 className='font-display text-lg font-semibold text-slate-950'>Correlation Matrix</h2>
+                  <p className='text-sm text-slate-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
+                </div>
               </div>
-            ) : null}
-          </div>
-
-          <div className='overflow-hidden rounded-[1.75rem] border border-brand-400/20 bg-white/85 shadow-inner'>
-            {results.nilearn_connectome_html ? (
-              <iframe
-                title='3D Brain Connectivity Map'
-                srcDoc={results.nilearn_connectome_html}
-                className='w-full border-0'
-                style={{ height: '540px' }}
-                sandbox='allow-scripts allow-same-origin'
+              <CorrelationMatrix
+                data={results}
+                fileName={results.file_name}
+                title=''
+                subtitle=''
               />
-            ) : (
-              <div className='flex h-[540px] items-center justify-center text-sm text-ink-700'>
-                3D connectome output is not available for this run.
-              </div>
-            )}
-          </div>
-
-          <div className='rounded-2xl border border-brand-400/20 bg-white/90 p-4'>
-            <div className='mb-3 flex items-center justify-between gap-3'>
-              <div className='flex items-center gap-2 text-sm font-semibold text-ink-950'>
-                <Activity className='h-4 w-4 text-brand-700' />
-                <span>Playback Slider</span>
-              </div>
-              <div className='text-right text-xs text-ink-700'>
-                <p>TR Index: <span className='mono-data'>{currentTrValue ?? 'N/A'}</span></p>
-                {currentGlobalSignal !== null ? (
-                  <p>Global Average: <span className='mono-data'>{currentGlobalSignal.toFixed(4)}</span></p>
-                ) : null}
-              </div>
             </div>
-            <input
-              type='range'
-              min={0}
-              max={timeSeriesMaxIndex}
-              step={1}
-              value={currentTrIndex}
-              onChange={(event) => setCurrentTrIndex(Number(event.target.value))}
-              disabled={!focusedTimeSeries || timeSeriesMaxIndex === 0}
-              className='w-full accent-blue-600'
-            />
-            <div className='mt-3 grid gap-3 sm:grid-cols-3'>
-              {topConnections.map((link, index) => (
-                <div key={`${link.source_roi}-${link.target_roi}-${index}`} className='rounded-xl border border-brand-400/15 bg-slate-50 px-3 py-2'>
-                  <p className='text-[11px] uppercase tracking-[0.1em] text-ink-700'>Top Link {index + 1}</p>
-                  <p className='text-sm font-medium text-ink-950'>
-                    {link.source_label} to {link.target_label}
-                  </p>
-                  <p className='text-xs text-ink-700'>
-                    r = {link.weight.toFixed(3)} ({link.sign})
+
+            <div className='flex h-full flex-col space-y-4'>
+              <div>
+                <div>
+                  <h2 className='font-display text-lg font-semibold text-slate-950'>Time Series Graph</h2>
+                  <p className='text-sm text-slate-700'>
+                    Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
                   </p>
                 </div>
-              ))}
+              </div>
+              <BoldTimeSeries
+                timeSeries={focusedTimeSeries}
+                highlightedTrIndex={currentTrValue ?? null}
+                title=''
+                subtitle=''
+              />
             </div>
-            <p className='text-xs text-ink-700'>
-              These highlighted links and ROI traces are keyed to the <span className='font-semibold'>ListSort (Age Adjusted)</span> model selection.
-            </p>
-          </div>
-        </div>
-
-        <div className='space-y-6'>
-          <ScoreCategoryCard
-            category='cognition'
-            selectedScoreId={selectedScore?.id ?? null}
-            predictedValues={predictedValues}
-            onSelect={setSelectedScoreId}
-          />
-          <ScoreCategoryCard
-            category='emotion'
-            selectedScoreId={selectedScore?.id ?? null}
-            predictedValues={predictedValues}
-            onSelect={setSelectedScoreId}
-          />
-        </div>
-      </section>
-
-      <section className='surface-card-strong space-y-4'>
-        <div className='flex items-center gap-3'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-            <Brain className='h-5 w-5' />
-          </div>
-          <div>
-            <h2 className='font-display text-2xl text-ink-950'>Static Brain Views</h2>
-            <p className='text-sm text-ink-700'>Axial, sagittal, and coronal anatomical references for the current map.</p>
-          </div>
-        </div>
-        <StaticBrainViews
-          markersPngBase64={results.nilearn_markers_png_base64}
-          scoreShortName={selectedScore?.shortName ?? 'Selected score'}
-        />
-      </section>
-
-      <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
-        <div className='flex h-full flex-col space-y-4'>
-          <div className='flex items-center gap-3'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-              <ChartNoAxesColumn className='h-5 w-5' />
-            </div>
-            <div>
-              <h2 className='font-display text-2xl text-ink-950'>Correlation Matrix</h2>
-              <p className='text-sm text-ink-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
-            </div>
-          </div>
-          <CorrelationMatrix
-            data={results}
-            fileName={results.file_name}
-            title=''
-            subtitle=''
-          />
-        </div>
-
-        <div className='flex h-full flex-col space-y-4'>
-          <div className='flex items-center gap-3'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-brand-700 shadow-sm'>
-              <Activity className='h-5 w-5' />
-            </div>
-            <div>
-              <h2 className='font-display text-2xl text-ink-950'>Time Series Graph</h2>
-              <p className='text-sm text-ink-700'>
-                Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
-              </p>
-            </div>
-          </div>
-          <BoldTimeSeries
-            timeSeries={focusedTimeSeries}
-            highlightedTrIndex={currentTrValue ?? null}
-            title=''
-            subtitle=''
-          />
+          </section>
         </div>
       </section>
     </div>

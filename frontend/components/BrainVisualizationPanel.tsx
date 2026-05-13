@@ -169,7 +169,7 @@ export default function BrainVisualizationPanel({
             title={`Global ${selectedScore?.shortName ?? 'score'} model importance brain`}
             src={importanceBrainUrl}
             className='w-full border-0'
-            style={{ height: '620px' }}
+            style={{ height: '500px' }}
             sandbox='allow-scripts allow-same-origin'
           />
         ) : connectomeHtml ? (

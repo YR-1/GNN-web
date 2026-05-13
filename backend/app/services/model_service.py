@@ -366,18 +366,32 @@ def create_nilearn_markers_payload(
     }
 
 
+def get_cached_importance_brain_urls() -> Dict[str, str]:
+    """Return cached 3D model-importance brain URLs keyed by score id."""
+    return {
+        score_id: str(config["brain_url"])
+        for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
+        if Path(str(config["brain_path"])).exists()
+    }
+
+
+def get_cached_importance_static_brain_urls() -> Dict[str, str]:
+    """Return cached static model-importance brain URLs keyed by score id."""
+    return {
+        score_id: str(config["static_url"])
+        for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
+        if Path(str(config["static_path"])).exists()
+    }
+
+
 def get_cached_listsort_importance_brain_url() -> Optional[str]:
     """Return the public URL for the cached global ListSort importance brain if generated."""
-    if LISTSORT_IMPORTANCE_BRAIN_HTML_PATH.exists():
-        return LISTSORT_IMPORTANCE_BRAIN_STATIC_URL
-    return None
+    return get_cached_importance_brain_urls().get("listsort_ageadj")
 
 
 def get_cached_listsort_importance_static_brain_url() -> Optional[str]:
     """Return the public URL for the cached 4-panel ListSort static brain if generated."""
-    if LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH.exists():
-        return LISTSORT_IMPORTANCE_STATIC_BRAIN_URL
-    return None
+    return get_cached_importance_static_brain_urls().get("listsort_ageadj")
 
 
 EXPECTED_NROIS = 268
@@ -389,6 +403,8 @@ DEFAULT_XAI_TOP_K_WINDOWS = 3
 DEFAULT_XAI_MAX_WINDOWS = 3
 LISTSORT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/listsort_importance_3d.html"
 LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.png"
+PMAT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/pmat_importance_3d.html"
+PMAT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/pmat_importance_4panel.png"
 LISTSORT_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
@@ -401,6 +417,32 @@ LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = (
     / "brain_plots"
     / "listsort_importance_4panel.png"
 )
+PMAT_IMPORTANCE_BRAIN_HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "pmat_importance_3d.html"
+)
+PMAT_IMPORTANCE_STATIC_BRAIN_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "pmat_importance_4panel.png"
+)
+SCORE_IMPORTANCE_PLOTS = {
+    "listsort_ageadj": {
+        "brain_url": LISTSORT_IMPORTANCE_BRAIN_STATIC_URL,
+        "brain_path": LISTSORT_IMPORTANCE_BRAIN_HTML_PATH,
+        "static_url": LISTSORT_IMPORTANCE_STATIC_BRAIN_URL,
+        "static_path": LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
+    },
+    "pmat": {
+        "brain_url": PMAT_IMPORTANCE_BRAIN_STATIC_URL,
+        "brain_path": PMAT_IMPORTANCE_BRAIN_HTML_PATH,
+        "static_url": PMAT_IMPORTANCE_STATIC_BRAIN_URL,
+        "static_path": PMAT_IMPORTANCE_STATIC_BRAIN_PATH,
+    },
+}
 
 
 def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -565,6 +607,21 @@ def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any
         raise ValueError("Checkpoint does not contain a valid state_dict payload.")
 
     config = loaded_obj.get("config", {}) if isinstance(loaded_obj.get("config", {}), dict) else {}
+
+    # --- BrainGNN (pmat.pt and similar) ---
+    try:
+        from .braingnn_inference import build_braingnn_from_checkpoint, is_braingnn_state_dict
+
+        if is_braingnn_state_dict(state_dict):
+            model, architecture, _ = build_braingnn_from_checkpoint(loaded_obj)
+            setattr(model, "_checkpoint_architecture", architecture)
+            setattr(model, "_prediction_scale", "normalized")
+            print(f"[model] Reconstructed checkpoint architecture: {architecture}")
+            return model
+    except Exception as exc:
+        print(f"[model] BrainGNN reconstruction skipped: {exc}")
+
+    # --- FBNetGen / GATv2 ---
     in_dim = _infer_input_dim_from_checkpoint(state_dict, sample_graph)
 
     try:
@@ -1216,6 +1273,8 @@ def _build_results_payload(
         "file_size": file_size,
         "file_name": file_name,
         "nilearn_connectome_html": nilearn_payload.get("html"),
+        "importance_brain_urls": get_cached_importance_brain_urls(),
+        "importance_static_brain_urls": get_cached_importance_static_brain_urls(),
         "listsort_importance_brain_url": get_cached_listsort_importance_brain_url(),
         "listsort_importance_static_brain_url": get_cached_listsort_importance_static_brain_url(),
         "top_links": top_links,

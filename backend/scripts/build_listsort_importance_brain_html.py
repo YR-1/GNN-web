@@ -583,7 +583,6 @@ def main() -> None:
         include_plotlyjs = False
     else:
         include_plotlyjs = args.include_plotlyjs
-<<<<<<< HEAD
     fig.write_html(
         str(args.output),
         include_plotlyjs=include_plotlyjs,
@@ -599,19 +598,13 @@ def main() -> None:
     html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)
     args.output.write_text(html, encoding="utf-8")
     print(f"Saved cached ListSort importance brain: {args.output}")
-    build_static_4panel_png(args.nodes_json, args.importance_json, args.static_output)
-    print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")
-=======
-    fig.write_html(str(args.output), include_plotlyjs=include_plotlyjs)
-    print(f"Saved cached importance brain: {args.output}")
     build_static_4panel_png(
         args.nodes_json,
         args.importance_json,
         args.static_output,
         plot_title=args.plot_title,
     )
-    print(f"Saved cached static 4-panel brain: {args.static_output}")
->>>>>>> main
+    print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")
 
 
 if __name__ == "__main__":

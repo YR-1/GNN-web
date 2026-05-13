@@ -201,14 +201,18 @@ export const useAuthStore = create<AuthStore>((set) => {
 interface AnalysisStore {
   active_analysis: AnalysisResponse | null
   latest_analysis: AnalysisResponse | null
+  selected_prediction_score_id: string | null
   setActiveAnalysis: (analysis: AnalysisResponse | null) => void
   setLatestAnalysis: (analysis: AnalysisResponse | null) => void
+  setSelectedPredictionScoreId: (scoreId: string | null) => void
 }
 
 export const useAnalysisStore = create<AnalysisStore>((set) => ({
   active_analysis: null,
   latest_analysis: null,
+  selected_prediction_score_id: 'listsort_ageadj',
   setActiveAnalysis: (analysis) => set({ active_analysis: analysis }),
   setLatestAnalysis: (analysis) => set({ latest_analysis: analysis }),
+  setSelectedPredictionScoreId: (scoreId) => set({ selected_prediction_score_id: scoreId }),
 }))
 

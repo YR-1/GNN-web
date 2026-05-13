@@ -37,8 +37,8 @@ function normalizeScoreId(value: string): string {
 
 function toCanonicalScoreId(value: string): string {
   const alias: Record<string, string> = {
-    emotion_score: 'emotion_recognition',
-    emotion: 'emotion_recognition',
+    emotion_score: 'emotsupp_unadj',
+    emotion: 'emotsupp_unadj',
     attention: 'sustained_attention',
     wm: 'listsort_ageadj',
     working_memory: 'listsort_ageadj',
@@ -127,7 +127,7 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
   listsort_ageadj: '#7c3aed',
   pmat: '#a855f7',
   sustained_attention: '#ec4899',
-  emotion_recognition: '#ef4444',
+  emotsupp_unadj: '#ef4444',
   sleep_quality: '#f97316',
 }
 
@@ -278,7 +278,7 @@ export default function Predictions2Page() {
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
   const metricScores = SCORE_REGISTRY.filter((score) =>
-    ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotion_recognition', 'sleep_quality'].includes(score.id)
+    ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotsupp_unadj', 'sleep_quality'].includes(score.id)
   )
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')

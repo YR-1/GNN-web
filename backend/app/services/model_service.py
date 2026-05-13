@@ -405,6 +405,8 @@ LISTSORT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/listsort_importance_
 LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.png"
 PMAT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/pmat_importance_3d.html"
 PMAT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/pmat_importance_4panel.png"
+EMOTSUPP_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/emotsupp_importance_3d.html"
+EMOTSUPP_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/emotsupp_importance_4panel.png"
 LISTSORT_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
@@ -429,6 +431,18 @@ PMAT_IMPORTANCE_STATIC_BRAIN_PATH = (
     / "brain_plots"
     / "pmat_importance_4panel.png"
 )
+EMOTSUPP_IMPORTANCE_BRAIN_HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "emotsupp_importance_3d.html"
+)
+EMOTSUPP_IMPORTANCE_STATIC_BRAIN_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "emotsupp_importance_4panel.png"
+)
 SCORE_IMPORTANCE_PLOTS = {
     "listsort_ageadj": {
         "brain_url": LISTSORT_IMPORTANCE_BRAIN_STATIC_URL,
@@ -441,6 +455,12 @@ SCORE_IMPORTANCE_PLOTS = {
         "brain_path": PMAT_IMPORTANCE_BRAIN_HTML_PATH,
         "static_url": PMAT_IMPORTANCE_STATIC_BRAIN_URL,
         "static_path": PMAT_IMPORTANCE_STATIC_BRAIN_PATH,
+    },
+    "emotsupp_unadj": {
+        "brain_url": EMOTSUPP_IMPORTANCE_BRAIN_STATIC_URL,
+        "brain_path": EMOTSUPP_IMPORTANCE_BRAIN_HTML_PATH,
+        "static_url": EMOTSUPP_IMPORTANCE_STATIC_BRAIN_URL,
+        "static_path": EMOTSUPP_IMPORTANCE_STATIC_BRAIN_PATH,
     },
 }
 
@@ -608,6 +628,19 @@ def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any
 
     config = loaded_obj.get("config", {}) if isinstance(loaded_obj.get("config", {}), dict) else {}
 
+    # --- T-RegGNN v17 (emotsupp_unadj.pt and similar) ---
+    try:
+        from .tregnn_inference import build_tregnn_from_checkpoint, is_tregnn_state_dict
+
+        if is_tregnn_state_dict(state_dict):
+            model, architecture, _ = build_tregnn_from_checkpoint(loaded_obj)
+            setattr(model, "_checkpoint_architecture", architecture)
+            setattr(model, "_prediction_scale", "original")  # un-z-scored inside forward
+            print(f"[model] Reconstructed checkpoint architecture: {architecture}")
+            return model
+    except Exception as exc:
+        print(f"[model] T-RegGNN reconstruction skipped: {exc}")
+        
     # --- BrainGNN (pmat.pt and similar) ---
     try:
         from .braingnn_inference import build_braingnn_from_checkpoint, is_braingnn_state_dict

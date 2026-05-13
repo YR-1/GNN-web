@@ -21,8 +21,14 @@ const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix')
 })
 
 const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
-const LISTSORT_IMPORTANCE_BRAIN_PATH = '/static/brain_plots/listsort_importance_3d.html'
-const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_importance_4panel.png'
+const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
+  listsort_ageadj: '/static/brain_plots/listsort_importance_3d.html',
+  pmat: '/static/brain_plots/pmat_importance_3d.html',
+}
+const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
+  listsort_ageadj: '/static/brain_plots/listsort_importance_4panel.png',
+  pmat: '/static/brain_plots/pmat_importance_4panel.png',
+}
 
 interface PredictionReportProps {
   analysis: AnalysisResponse
@@ -136,6 +142,24 @@ export function PredictionReport({
     [selectedScoreId]
   )
 
+  const selectedImportanceBrainUrl = useMemo(() => {
+    if (!selectedScore) return null
+    const path =
+      results?.importance_brain_urls?.[selectedScore.id] ??
+      (selectedScore.id === 'listsort_ageadj' ? results?.listsort_importance_brain_url : null) ??
+      FALLBACK_IMPORTANCE_BRAIN_PATHS[selectedScore.id]
+    return toBackendUrl(path)
+  }, [results?.importance_brain_urls, results?.listsort_importance_brain_url, selectedScore])
+
+  const selectedImportanceStaticBrainUrl = useMemo(() => {
+    if (!selectedScore) return null
+    const path =
+      results?.importance_static_brain_urls?.[selectedScore.id] ??
+      (selectedScore.id === 'listsort_ageadj' ? results?.listsort_importance_static_brain_url : null) ??
+      FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
+    return toBackendUrl(path)
+  }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
+
   if (analysis.status !== 'completed') {
     return (
       <div className='status-banner status-banner-warning'>
@@ -160,7 +184,7 @@ export function PredictionReport({
           File: <span className='mono-data'>{results.file_name}</span>
         </p>
         <p className='section-subtitle'>
-          Visual model link: <span className='font-semibold text-ink-950'>ListSort (Age Adjusted)</span>
+          Visual model link: <span className='font-semibold text-ink-950'>{selectedScore?.name ?? 'Selected score'}</span>
         </p>
         {executionIdLabel && (
           <p className='section-subtitle'>
@@ -184,7 +208,7 @@ export function PredictionReport({
           predictedValues={predictedValues}
           correlationMatrix={results.correlation_matrix}
           connectomeHtml={results.nilearn_connectome_html}
-          listsortImportanceBrainUrl={toBackendUrl(results.listsort_importance_brain_url ?? LISTSORT_IMPORTANCE_BRAIN_PATH)}
+          importanceBrainUrl={selectedImportanceBrainUrl}
           selectedScoreId={selectedScoreId}
           onSelectScore={setSelectedScoreId}
         />
@@ -193,10 +217,8 @@ export function PredictionReport({
 
         <StaticBrainViews
           markersPngBase64={results.nilearn_markers_png_base64}
-          listsortStaticBrainUrl={toBackendUrl(
-            results.listsort_importance_static_brain_url ?? LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH
-          )}
-          showListSortStaticBrain={selectedScore?.id === PRIMARY_VISUAL_SCORE_ID}
+          importanceStaticBrainUrl={selectedImportanceStaticBrainUrl}
+          showImportanceStaticBrain={Boolean(selectedImportanceStaticBrainUrl)}
           scoreShortName={selectedScore?.shortName ?? ''}
         />
       </div>

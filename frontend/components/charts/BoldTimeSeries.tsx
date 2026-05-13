@@ -23,6 +23,19 @@ export function BoldTimeSeries({
     borderColor: '#949bad',
     color: '#ffffff',
   } as const
+  const getCurrentRanges = () => {
+    const plotEl = plotRef.current as unknown as {
+      _fullLayout?: {
+        xaxis?: { range?: [number, number] }
+        yaxis?: { range?: [number, number] }
+      }
+    } | null
+
+    return {
+      xRange: plotEl?._fullLayout?.xaxis?.range,
+      yRange: plotEl?._fullLayout?.yaxis?.range,
+    }
+  }
   const hasData =
     !!timeSeries &&
     Array.isArray(timeSeries.tr_index) &&
@@ -68,6 +81,8 @@ export function BoldTimeSeries({
           yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
           legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
           autosize: true,
+          dragmode: 'zoom' as const,
+          uirevision: 'time-series-graph',
           margin: { l: 56, r: 20, t: 44, b: 60 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
@@ -112,6 +127,7 @@ export function BoldTimeSeries({
       'xaxis.autorange': true,
       'yaxis.autorange': true,
       dragmode: 'zoom',
+      selections: [],
     }).catch((error: unknown) => {
       console.error('Error resetting plot view:', error)
     })
@@ -119,11 +135,7 @@ export function BoldTimeSeries({
 
   const zoomBy = (factor: number) => {
     if (!plotRef.current || !plotlyRef.current) return
-    const plotEl = plotRef.current as unknown as {
-      layout?: { xaxis?: { range?: [number, number] }; yaxis?: { range?: [number, number] } }
-    }
-    const xRange = plotEl.layout?.xaxis?.range
-    const yRange = plotEl.layout?.yaxis?.range
+    const { xRange, yRange } = getCurrentRanges()
     if (!xRange || !yRange) {
       resetView()
       return

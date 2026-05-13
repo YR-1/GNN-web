@@ -8,8 +8,7 @@ import { useAuthStore } from '@/lib/store'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/upload', label: 'Upload Data' },
-  { href: '/predictions', label: 'Predictions' },
-  { href: '/predictions2', label: 'Predictions 2' },
+  { href: '/predictions2', label: 'Predictions' },
   { href: '/history', label: 'History' },
     { href: '/model-performance', label: 'Model Performance' }, 
     { href: '/documentation', label: 'Documentation' },

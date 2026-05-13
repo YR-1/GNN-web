@@ -1,12 +1,13 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { AnalysisResponse, CorrelationResults } from '@/lib/types'
 import { SCORE_REGISTRY } from '@/lib/score-registry'
 import { simulateScore, SimulatedScoreResult } from '@/lib/score-simulator'
 import { BoldTimeSeries } from '@/components/charts/BoldTimeSeries'
 import { API_BASE_URL } from '@/lib/api'
+import { useAnalysisStore } from '@/lib/store'
 
 const BrainVisualizationPanel = dynamic(() => import('@/components/BrainVisualizationPanel'), { ssr: false })
 const StaticBrainViews = dynamic(() => import('@/components/StaticBrainViews'), { ssr: false })
@@ -68,7 +69,8 @@ export function PredictionReport({
   heading = 'Prediction Report',
   executionIdLabel = true,
 }: PredictionReportProps) {
-  const [selectedScoreId, setSelectedScoreId] = useState<string | null>(PRIMARY_VISUAL_SCORE_ID)
+  const selectedScoreId = useAnalysisStore((state) => state.selected_prediction_score_id)
+  const setSelectedScoreId = useAnalysisStore((state) => state.setSelectedPredictionScoreId)
 
   const results = analysis.results as CorrelationResults | undefined
 

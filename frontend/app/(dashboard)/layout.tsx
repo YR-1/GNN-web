@@ -58,7 +58,7 @@ export default function DashboardLayout({
       <nav className='top-nav'>
         <div className='top-nav-inner'>
           <div className='top-nav-brand'>
-            <Image src='/fyp-logo-brain.png' alt='MindPulse' width={50} height={50} className='rounded-lg' />
+            <Image src='/fyp-logo-brain.png' alt='MindPulse' width={36} height={36} className='rounded-md' />
             <Link href='/dashboard' className='brand-title'>
               MindPulse
             </Link>

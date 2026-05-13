@@ -169,7 +169,7 @@ export default function BrainVisualizationPanel({
             title='Global ListSort FBNetGen importance brain'
             src={listsortImportanceBrainUrl}
             className='w-full border-0'
-            style={{ height: '620px' }}
+            style={{ height: '500px' }}
             sandbox='allow-scripts allow-same-origin'
           />
         ) : showListSortImportanceBrain ? (

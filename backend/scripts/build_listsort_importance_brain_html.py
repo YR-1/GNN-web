@@ -230,7 +230,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
                         thicknessmode="pixels",
                         thickness=20,
                         lenmode="pixels",
-                        len=290,
+                        len=210,
                         y=0.5,
                         yanchor="middle",
                     ),
@@ -323,7 +323,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             zaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             bgcolor="rgba(0,0,0,0)",
             aspectmode="data",
-            camera=dict(eye=dict(x=1, y=1, z=0.8)),
+            camera=dict(eye=dict(x=0.85, y=0.85, z=0.68)),
         ),
         updatemenus=[
             dict(
@@ -351,7 +351,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             font=dict(size=11),
         ),
         margin=dict(l=0, r=0, t=0, b=0),
-        height=500,
+        height=300,
     )
     return fig
 
@@ -572,7 +572,20 @@ def main() -> None:
         include_plotlyjs = False
     else:
         include_plotlyjs = args.include_plotlyjs
-    fig.write_html(str(args.output), include_plotlyjs=include_plotlyjs)
+    fig.write_html(
+        str(args.output),
+        include_plotlyjs=include_plotlyjs,
+        config={
+            "displayModeBar": False,
+            "displaylogo": False,
+            "responsive": True,
+        },
+        default_width="100%",
+        default_height="300px",
+    )
+    html = args.output.read_text(encoding="utf-8")
+    html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)
+    args.output.write_text(html, encoding="utf-8")
     print(f"Saved cached ListSort importance brain: {args.output}")
     build_static_4panel_png(args.nodes_json, args.importance_json, args.static_output)
     print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")

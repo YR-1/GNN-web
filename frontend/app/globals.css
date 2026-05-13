@@ -130,16 +130,16 @@
   }
 
   .top-nav-inner {
-    @apply w-full px-3 sm:px-5 lg:px-6 py-2 grid items-center gap-2;
+    @apply w-full px-3 sm:px-4 lg:px-5 py-1 grid items-center gap-1;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
   .top-nav-brand {
-    @apply flex items-center gap-2.5 shrink-0 justify-self-start;
+    @apply flex items-center gap-2 shrink-0 justify-self-start;
   }
 
   .top-nav-tabs {
-    @apply flex items-center gap-1 overflow-x-auto justify-self-center;
+    @apply flex items-center gap-0.5 overflow-x-auto justify-self-center;
     scrollbar-width: none;
   }
 
@@ -152,7 +152,7 @@
   }
 
   .nav-link {
-    @apply relative whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors;
+    @apply relative whitespace-nowrap px-2 py-1 text-xs font-medium transition-colors;
     color: var(--ink-700);
   }
 
@@ -161,7 +161,7 @@
   }
 
   .nav-link-active {
-    @apply relative whitespace-nowrap px-3 py-2 text-sm font-semibold transition-colors;
+    @apply relative whitespace-nowrap px-2 py-1 text-xs font-semibold transition-colors;
     color: var(--brand-700);
   }
 
@@ -178,28 +178,28 @@
   }
 
   .brand-title {
-    @apply font-display text-[1.75rem] leading-none font-semibold;
+    @apply font-display text-[1.25rem] leading-none font-semibold;
     color: var(--ink-950);
   }
 
   .account-panel {
-    @apply flex items-center gap-1.5;
+    @apply flex items-center gap-1;
   }
 
   .account-avatar {
-    @apply flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold;
+    @apply flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold;
     color: var(--brand-700);
     background: rgba(219, 234, 254, 0.7);
     border: 1px solid rgba(59, 130, 246, 0.2);
   }
 
   .account-email {
-    @apply hidden md:inline-block text-xs font-medium max-w-[170px] truncate px-1;
+    @apply hidden md:inline-block text-[10px] font-medium max-w-[145px] truncate px-1;
     color: var(--ink-700);
   }
 
   .account-signout {
-    @apply px-2.5 py-1 text-xs font-medium transition rounded-md border;
+    @apply px-1.5 py-0.5 text-[10px] font-medium transition rounded-md border;
     color: var(--danger-700);
     border-color: rgba(190, 18, 60, 0.35);
     background: rgba(255, 255, 255, 0.56);

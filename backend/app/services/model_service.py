@@ -565,6 +565,21 @@ def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any
         raise ValueError("Checkpoint does not contain a valid state_dict payload.")
 
     config = loaded_obj.get("config", {}) if isinstance(loaded_obj.get("config", {}), dict) else {}
+
+    # --- BrainGNN (pmat.pt and similar) ---
+    try:
+        from .braingnn_inference import build_braingnn_from_checkpoint, is_braingnn_state_dict
+
+        if is_braingnn_state_dict(state_dict):
+            model, architecture, _ = build_braingnn_from_checkpoint(loaded_obj)
+            setattr(model, "_checkpoint_architecture", architecture)
+            setattr(model, "_prediction_scale", "normalized")
+            print(f"[model] Reconstructed checkpoint architecture: {architecture}")
+            return model
+    except Exception as exc:
+        print(f"[model] BrainGNN reconstruction skipped: {exc}")
+
+    # --- FBNetGen / GATv2 ---
     in_dim = _infer_input_dim_from_checkpoint(state_dict, sample_graph)
 
     try:

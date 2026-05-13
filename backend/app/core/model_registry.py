@@ -8,7 +8,7 @@ from .config import Settings
 DEFAULT_SCORE_MODELS = [
     "listsort_ageadj",
     "sleep_quality",
-    "emotion_recognition",
+    "emotsupp_unadj",
     "picseq",
     "pmat",
 ]

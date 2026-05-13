@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
+import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
 import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
@@ -22,6 +22,14 @@ const BoldTimeSeries = dynamic(
 const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
 const LISTSORT_IMPORTANCE_BRAIN_PATH = '/static/brain_plots/listsort_importance_3d.html'
 const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_importance_4panel.png'
+const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
+  listsort_ageadj: LISTSORT_IMPORTANCE_BRAIN_PATH,
+  pmat: '/static/brain_plots/pmat_importance_3d.html',
+}
+const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
+  listsort_ageadj: LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
+  pmat: '/static/brain_plots/pmat_importance_4panel.png',
+}
 
 function normalizeScoreId(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -129,10 +137,11 @@ export default function Predictions2Page() {
   const latestAnalysis = useAnalysisStore((state) => state.latest_analysis)
   const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)
   const setLatestAnalysis = useAnalysisStore((state) => state.setLatestAnalysis)
+  const selectedScoreId = useAnalysisStore((state) => state.selected_prediction_score_id)
+  const setSelectedScoreId = useAnalysisStore((state) => state.setSelectedPredictionScoreId)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedScoreId, setSelectedScoreId] = useState<string | null>(PRIMARY_VISUAL_SCORE_ID)
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
 
   useEffect(() => {
@@ -252,11 +261,22 @@ export default function Predictions2Page() {
   )
 
   const selectedScoreResult = selectedScore ? predictedValues[selectedScore.id] : null
-  const showListSortBrain = selectedScore?.id === PRIMARY_VISUAL_SCORE_ID
-  const listsortImportanceBrainUrl = toBackendUrl(results?.listsort_importance_brain_url ?? LISTSORT_IMPORTANCE_BRAIN_PATH)
-  const listsortStaticBrainUrl = toBackendUrl(
-    results?.listsort_importance_static_brain_url ?? LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH
-  )
+  const selectedImportanceBrainUrl = useMemo(() => {
+    if (!selectedScore) return null
+    const path =
+      results?.importance_brain_urls?.[selectedScore.id] ??
+      (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_brain_url : null) ??
+      FALLBACK_IMPORTANCE_BRAIN_PATHS[selectedScore.id]
+    return toBackendUrl(path)
+  }, [results?.importance_brain_urls, results?.listsort_importance_brain_url, selectedScore])
+  const selectedImportanceStaticBrainUrl = useMemo(() => {
+    if (!selectedScore) return null
+    const path =
+      results?.importance_static_brain_urls?.[selectedScore.id] ??
+      (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_static_brain_url : null) ??
+      FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
+    return toBackendUrl(path)
+  }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
   const metricScores = SCORE_REGISTRY.filter((score) =>
     ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotion_recognition', 'sleep_quality'].includes(score.id)
   )
@@ -276,8 +296,8 @@ export default function Predictions2Page() {
 
   const currentTrValue = focusedTimeSeries?.tr_index[currentTrIndex]
 
-  const currentBrainTitle = showListSortBrain
-    ? 'Global ListSort FBNetGen importance brain'
+  const currentBrainTitle = selectedImportanceBrainUrl
+    ? `Global ${selectedScore?.shortName ?? 'score'} model importance brain`
     : '3D Brain Connectivity Map'
 
   if (error) {
@@ -304,7 +324,7 @@ export default function Predictions2Page() {
   if (!activeAnalysis || activeAnalysis.status !== 'completed' || !results) {
     return (
       <div className='page-container text-center py-12'>
-        <h1 className='section-title'>Predictions 2</h1>
+        <h1 className='section-title'>Predictions</h1>
         <p className='section-subtitle mt-2'>This tab is designed for completed analyses.</p>
         <p className='text-sm text-ink-700 mt-4'>No completed analyses are available yet.</p>
         <div className='mt-5 flex justify-center gap-3'>
@@ -336,19 +356,13 @@ export default function Predictions2Page() {
             <div className='grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
               <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
                 <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
-                  {showListSortBrain ? (
-                    listsortImportanceBrainUrl ? (
-                      <iframe
-                        title={currentBrainTitle}
-                        src={listsortImportanceBrainUrl}
-                        className='h-full min-h-[15rem] w-full border-0'
-                        sandbox='allow-scripts allow-same-origin'
-                      />
-                    ) : (
-                      <div className='flex h-full min-h-[15rem] items-center justify-center text-sm text-slate-600'>
-                        3D brain visualization is not available for this run.
-                      </div>
-                    )
+                  {selectedImportanceBrainUrl ? (
+                    <iframe
+                      title={currentBrainTitle}
+                      src={selectedImportanceBrainUrl}
+                      className='h-full min-h-[15rem] w-full border-0'
+                      sandbox='allow-scripts allow-same-origin'
+                    />
                   ) : results.nilearn_connectome_html ? (
                     <iframe
                       title={currentBrainTitle}
@@ -367,37 +381,44 @@ export default function Predictions2Page() {
                   <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
                     <StaticBrainViews
                       markersPngBase64={results.nilearn_markers_png_base64}
-                      listsortStaticBrainUrl={listsortStaticBrainUrl}
-                      showListSortStaticBrain={showListSortBrain}
+                      listsortStaticBrainUrl={selectedImportanceStaticBrainUrl}
+                      showListSortStaticBrain={Boolean(selectedImportanceStaticBrainUrl)}
                       scoreShortName={selectedScore?.shortName ?? 'Selected score'}
                     />
                   </div>
                 </section>
               </div>
-            <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-3'>
-                <div className='mb-3 flex items-center justify-between gap-3'>
+            <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-2.5'>
+                <div className='mb-2 flex items-start justify-between gap-3'>
                   <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
                   {selectedScoreResult && selectedScore ? (
-                    <div className='text-right'>
+                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-white px-2.5 py-1.5 text-right shadow-sm'>
                       <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
                       <p className='text-sm font-semibold text-slate-950'>{selectedScore.shortName}</p>
                     </div>
                   ) : null}
                 </div>
 
-                <div className='flex-1 space-y-4'>
+                <div className='flex-1 space-y-2.5'>
                   {[
                     { id: 'cognition', label: 'Cognition Metrics', scores: cognitionMetricScores },
                     { id: 'emotion', label: 'Emotion Metrics', scores: emotionMetricScores },
                   ].map((group) => (
-                    <div key={group.id} className='space-y-2'>
+                    <div key={group.id} className={group.id === 'emotion' ? 'space-y-1.5 pt-2' : 'space-y-1.5'}>
                       <div className='px-1'>
-                        <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400'>
-                          {group.label}
-                        </p>
+                        <div className='flex items-center gap-2'>
+                          {group.id === 'cognition' ? (
+                            <Brain className='h-4 w-4 text-slate-700' />
+                          ) : (
+                            <Heart className='h-4 w-4 text-slate-700' />
+                          )}
+                          <p className='font-display text-base font-semibold text-slate-950'>
+                            {group.label}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className='space-y-3'>
+                      <div className='space-y-2'>
                         {group.scores.map((score) => {
                           const result = predictedValues[score.id]
                           const percent = result ? scorePercent(result.value, score) : 0
@@ -408,13 +429,13 @@ export default function Predictions2Page() {
                               key={score.id}
                               type='button'
                               onClick={() => setSelectedScoreId(score.id)}
-                              className={`w-full rounded-[1rem] border px-3 py-2.5 text-left transition ${
+                              className={`w-full rounded-[0.95rem] border px-3 py-2 text-left transition ${
                                 selectedScore?.id === score.id
-                                  ? 'border-slate-300 bg-slate-50 shadow-sm'
-                                  : 'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50'
+                                  ? 'border-slate-300 bg-slate-100 shadow-sm'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                               }`}
                             >
-                              <div className='mb-1.5 flex items-start justify-between gap-3'>
+                              <div className='mb-1 flex items-start justify-between gap-3'>
                                 <div className='min-w-0'>
                                   <div className='flex items-center gap-1.5'>
                                     <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
@@ -426,16 +447,18 @@ export default function Predictions2Page() {
                                       <Info className='h-2.5 w-2.5' />
                                     </span>
                                   </div>
-                                  <p className='text-[10px] text-slate-500'>{score.unit}</p>
-                                  <p className='text-[10px] text-slate-400'>{formatRangeLabel(score)}</p>
+                                  <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
+                                    <p className='text-slate-500'>{score.unit}</p>
+                                    <p className='text-slate-400'>{formatRangeLabel(score)}</p>
+                                  </div>
                                 </div>
-                                <div className='shrink-0 pt-0.5 text-right'>
-                                  <p className='text-lg font-semibold' style={{ color: accent }}>
+                                <div className='shrink-0 pl-2 pt-0.5 text-right'>
+                                  <p className='text-base font-semibold' style={{ color: accent }}>
                                     {result ? formatPredictionValue(result.value, score, result.valueScale) : '--'}
                                   </p>
                                 </div>
                               </div>
-                              <div className='h-2 overflow-hidden rounded-full bg-slate-100'>
+                              <div className='h-1.5 overflow-hidden rounded-full bg-slate-100'>
                                 <div
                                   className='h-full rounded-full transition-all'
                                   style={{

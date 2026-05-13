@@ -2,39 +2,39 @@
 
 interface StaticBrainViewsProps {
   markersPngBase64?: string | null
-  listsortStaticBrainUrl?: string | null
-  showListSortStaticBrain?: boolean
+  importanceStaticBrainUrl?: string | null
+  showImportanceStaticBrain?: boolean
   scoreShortName: string
 }
 
 const VIEWS = ['Sagittal', 'Coronal', 'Axial'] as const
-const LISTSORT_VIEWS = ['Left sagittal', 'Coronal', 'Right sagittal', 'Axial'] as const
+const IMPORTANCE_VIEWS = ['Left sagittal', 'Coronal', 'Right sagittal', 'Axial'] as const
 
 export default function StaticBrainViews({
   markersPngBase64,
-  listsortStaticBrainUrl,
-  showListSortStaticBrain = false,
+  importanceStaticBrainUrl,
+  showImportanceStaticBrain = false,
   scoreShortName,
 }: StaticBrainViewsProps) {
-  if (showListSortStaticBrain && listsortStaticBrainUrl) {
+  if (showImportanceStaticBrain && importanceStaticBrainUrl) {
     return (
       <div className='surface-card space-y-2'>
         <div>
           <p className='text-xs font-semibold text-ink-800'>Static Brain Views</p>
           <p className='text-[11px] text-ink-600'>
-            4-panel anatomical view for global ListSort FBNetGen importance.
+            4-panel anatomical view for global {scoreShortName} model importance.
           </p>
         </div>
         <div className='rounded-xl border border-brand-400/20 bg-white overflow-hidden'>
           <img
-            src={listsortStaticBrainUrl}
-            alt='4-panel anatomical ListSort FBNetGen importance brain'
+            src={importanceStaticBrainUrl}
+            alt={`4-panel anatomical ${scoreShortName} model importance brain`}
             className='w-full h-auto'
             loading='lazy'
             decoding='async'
           />
           <div className='grid grid-cols-4 border-t border-brand-400/10'>
-            {LISTSORT_VIEWS.map((label) => (
+            {IMPORTANCE_VIEWS.map((label) => (
               <p key={label} className='text-[10px] text-ink-700 text-center py-1'>
                 {label}
               </p>

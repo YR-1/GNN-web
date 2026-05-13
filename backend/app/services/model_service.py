@@ -366,18 +366,32 @@ def create_nilearn_markers_payload(
     }
 
 
+def get_cached_importance_brain_urls() -> Dict[str, str]:
+    """Return cached 3D model-importance brain URLs keyed by score id."""
+    return {
+        score_id: str(config["brain_url"])
+        for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
+        if Path(str(config["brain_path"])).exists()
+    }
+
+
+def get_cached_importance_static_brain_urls() -> Dict[str, str]:
+    """Return cached static model-importance brain URLs keyed by score id."""
+    return {
+        score_id: str(config["static_url"])
+        for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
+        if Path(str(config["static_path"])).exists()
+    }
+
+
 def get_cached_listsort_importance_brain_url() -> Optional[str]:
     """Return the public URL for the cached global ListSort importance brain if generated."""
-    if LISTSORT_IMPORTANCE_BRAIN_HTML_PATH.exists():
-        return LISTSORT_IMPORTANCE_BRAIN_STATIC_URL
-    return None
+    return get_cached_importance_brain_urls().get("listsort_ageadj")
 
 
 def get_cached_listsort_importance_static_brain_url() -> Optional[str]:
     """Return the public URL for the cached 4-panel ListSort static brain if generated."""
-    if LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH.exists():
-        return LISTSORT_IMPORTANCE_STATIC_BRAIN_URL
-    return None
+    return get_cached_importance_static_brain_urls().get("listsort_ageadj")
 
 
 EXPECTED_NROIS = 268
@@ -389,6 +403,8 @@ DEFAULT_XAI_TOP_K_WINDOWS = 3
 DEFAULT_XAI_MAX_WINDOWS = 3
 LISTSORT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/listsort_importance_3d.html"
 LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.png"
+PMAT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/pmat_importance_3d.html"
+PMAT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/pmat_importance_4panel.png"
 LISTSORT_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
@@ -401,6 +417,32 @@ LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = (
     / "brain_plots"
     / "listsort_importance_4panel.png"
 )
+PMAT_IMPORTANCE_BRAIN_HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "pmat_importance_3d.html"
+)
+PMAT_IMPORTANCE_STATIC_BRAIN_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "static"
+    / "brain_plots"
+    / "pmat_importance_4panel.png"
+)
+SCORE_IMPORTANCE_PLOTS = {
+    "listsort_ageadj": {
+        "brain_url": LISTSORT_IMPORTANCE_BRAIN_STATIC_URL,
+        "brain_path": LISTSORT_IMPORTANCE_BRAIN_HTML_PATH,
+        "static_url": LISTSORT_IMPORTANCE_STATIC_BRAIN_URL,
+        "static_path": LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
+    },
+    "pmat": {
+        "brain_url": PMAT_IMPORTANCE_BRAIN_STATIC_URL,
+        "brain_path": PMAT_IMPORTANCE_BRAIN_HTML_PATH,
+        "static_url": PMAT_IMPORTANCE_STATIC_BRAIN_URL,
+        "static_path": PMAT_IMPORTANCE_STATIC_BRAIN_PATH,
+    },
+}
 
 
 def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -1231,6 +1273,8 @@ def _build_results_payload(
         "file_size": file_size,
         "file_name": file_name,
         "nilearn_connectome_html": nilearn_payload.get("html"),
+        "importance_brain_urls": get_cached_importance_brain_urls(),
+        "importance_static_brain_urls": get_cached_importance_static_brain_urls(),
         "listsort_importance_brain_url": get_cached_listsort_importance_brain_url(),
         "listsort_importance_static_brain_url": get_cached_listsort_importance_static_brain_url(),
         "top_links": top_links,

@@ -1,0 +1,10 @@
+{
+  "method": "standard",
+  "original_mean": 16.60169491525424,
+  "original_std": 4.580984703759208,
+  "original_min": 6.000000377052405,
+  "original_max": 23.000000051383484,
+  "n_train_windows": 10620,
+  "target_variable": "PMAT24_A_CR",
+  "fold_pkl": "/content/drive/MyDrive/all_sub_PMAT24_A_CR/graphs_outer5_inner5.pkl"
+}

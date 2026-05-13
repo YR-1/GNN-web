@@ -227,6 +227,12 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
                         tickmode="array",
                         tickvals=[0, 0.5, 1],
                         ticktext=["Lower", "Mid", "Higher"],
+                        thicknessmode="pixels",
+                        thickness=20,
+                        lenmode="pixels",
+                        len=210,
+                        y=0.5,
+                        yanchor="middle",
                     ),
                     showscale=not any(trace_filter.get("kind") == "node" for trace_filter in trace_filters),
                     opacity=0.94,
@@ -311,23 +317,45 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
 
     fig = go.Figure(data=traces)
     fig.update_layout(
-        title=(
-            f"3D brain surface with Shen-268 importance graph: top {TOP_K_3D_NODES} nodes, top {len(edge_plot)} edges"
-            + f" from {edge_source_label}"
-            + (" (top-edge endpoints shown faintly)" if edge_endpoint_nodes else "")
-        ),
         scene=dict(
             xaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             yaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             zaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             bgcolor="rgba(0,0,0,0)",
             aspectmode="data",
-            camera=dict(eye=dict(x=1.7, y=1.7, z=1.25)),
+            camera=dict(
+                eye=dict(x=0.0, y=1.08, z=0.68),
+                up=dict(x=0, y=0, z=1),
+                center=dict(x=0, y=0, z=-0.02),
+            ),
         ),
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.01, y=0.98, xanchor="left", yanchor="top")],
-        legend=dict(x=0.01, y=0.82),
-        margin=dict(l=0, r=0, t=58, b=0),
-        height=820,
+        updatemenus=[
+            dict(
+                buttons=buttons,
+                direction="down",
+                x=0.06,
+                y=0.94,
+                xanchor="left",
+                yanchor="top",
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="rgba(148,163,184,0.45)",
+                borderwidth=1,
+                font=dict(size=11),
+                pad=dict(t=2, r=2, b=2, l=2),
+            )
+        ],
+        legend=dict(
+            x=0.06,
+            y=0.82,
+            xanchor="left",
+            yanchor="top",
+            bgcolor="rgba(255,255,255,0.88)",
+            bordercolor="rgba(148,163,184,0.4)",
+            borderwidth=1,
+            font=dict(size=11),
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=300,
     )
     return fig
 
@@ -555,6 +583,25 @@ def main() -> None:
         include_plotlyjs = False
     else:
         include_plotlyjs = args.include_plotlyjs
+<<<<<<< HEAD
+    fig.write_html(
+        str(args.output),
+        include_plotlyjs=include_plotlyjs,
+        config={
+            "displayModeBar": False,
+            "displaylogo": False,
+            "responsive": True,
+        },
+        default_width="100%",
+        default_height="300px",
+    )
+    html = args.output.read_text(encoding="utf-8")
+    html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)
+    args.output.write_text(html, encoding="utf-8")
+    print(f"Saved cached ListSort importance brain: {args.output}")
+    build_static_4panel_png(args.nodes_json, args.importance_json, args.static_output)
+    print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")
+=======
     fig.write_html(str(args.output), include_plotlyjs=include_plotlyjs)
     print(f"Saved cached importance brain: {args.output}")
     build_static_4panel_png(
@@ -564,6 +611,7 @@ def main() -> None:
         plot_title=args.plot_title,
     )
     print(f"Saved cached static 4-panel brain: {args.static_output}")
+>>>>>>> main
 
 
 if __name__ == "__main__":

@@ -323,7 +323,11 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             zaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             bgcolor="rgba(0,0,0,0)",
             aspectmode="data",
-            camera=dict(eye=dict(x=0.85, y=0.85, z=0.68)),
+            camera=dict(
+                eye=dict(x=0.0, y=1.08, z=0.68),
+                up=dict(x=0, y=0, z=1),
+                center=dict(x=0, y=0, z=-0.02),
+            ),
         ),
         updatemenus=[
             dict(

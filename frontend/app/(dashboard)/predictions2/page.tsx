@@ -25,10 +25,12 @@ const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_impo
 const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_3d.html',
+  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
+  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
 }
 
 function normalizeScoreId(value: string): string {
@@ -143,6 +145,7 @@ export default function Predictions2Page() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
+  const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -299,6 +302,11 @@ export default function Predictions2Page() {
   const currentBrainTitle = selectedImportanceBrainUrl
     ? `Global ${selectedScore?.shortName ?? 'score'} model importance brain`
     : '3D Brain Connectivity Map'
+  const isImportanceBrainLoading = Boolean(selectedImportanceBrainUrl) && selectedImportanceBrainUrl !== loadedImportanceBrainUrl
+
+  useEffect(() => {
+    setLoadedImportanceBrainUrl(null)
+  }, [selectedImportanceBrainUrl])
 
   if (error) {
     return (
@@ -357,12 +365,25 @@ export default function Predictions2Page() {
               <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
                 <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
                   {selectedImportanceBrainUrl ? (
-                    <iframe
-                      title={currentBrainTitle}
-                      src={selectedImportanceBrainUrl}
-                      className='h-full min-h-[15rem] w-full border-0'
-                      sandbox='allow-scripts allow-same-origin'
-                    />
+                    <div className='relative h-full min-h-[15rem]'>
+                      {isImportanceBrainLoading && (
+                        <div className='absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-slate-600'>
+                          <div className='text-center'>
+                            <div className='loading-spinner mx-auto mb-3' />
+                            <p>Loading selected brain plot...</p>
+                          </div>
+                        </div>
+                      )}
+                      <iframe
+                        title={currentBrainTitle}
+                        src={selectedImportanceBrainUrl}
+                        onLoad={() => setLoadedImportanceBrainUrl(selectedImportanceBrainUrl)}
+                        className={`h-full w-full border-0 transition-opacity ${
+                          isImportanceBrainLoading ? 'opacity-0' : 'opacity-100'
+                        }`}
+                        sandbox='allow-scripts allow-same-origin'
+                      />
+                    </div>
                   ) : results.nilearn_connectome_html ? (
                     <iframe
                       title={currentBrainTitle}

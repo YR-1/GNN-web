@@ -41,15 +41,14 @@ export default function SignupPage() {
   return (
     <main className='app-bg'>
       <div className='noise-overlay' aria-hidden='true' />
-      <section className='page-shell min-h-screen flex items-center justify-center'>
-        <div className='w-full max-w-md fade-in-up'>
-          <div className='flex items-center justify-center'>
-            <Image src='/fyp-logo.png' alt='MindPulse' width={200} height={200} className='rounded-xl' />
-          </div>
-
-          <div className='surface-card-strong'>
+      <section className='auth-shell'>
+        <div className='auth-panel fade-in-up'>
+          <div className='surface-card-strong w-full'>
             {confirmed ? (
               <>
+                <div className='mb-0 flex items-center justify-center'>
+                  <Image src='/fyp-logo.png' alt='MindPulse' width={100} height={100} className='rounded-xl' />
+                </div>
                 <h1 className='font-display text-3xl text-ink-950 text-center'>Account Created</h1>
                 <p className='section-subtitle text-center mt-2'>
                   Verify your email, then sign in to continue.
@@ -63,6 +62,9 @@ export default function SignupPage() {
               </>
             ) : (
               <>
+                <div className='mb-0 flex items-center justify-center'>
+                  <Image src='/fyp-logo.png' alt='MindPulse' width={100} height={100} className='rounded-xl' />
+                </div>
                 <h1 className='font-display text-3xl text-ink-950 text-center'>Create Account</h1>
                 <p className='section-subtitle text-center mt-2'>
                   Start uploading ROI time-series files in minutes.

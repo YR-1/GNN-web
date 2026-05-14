@@ -3,20 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  ArrowUpDown,
-  ArchiveRestore,
-  Check,
-  ChevronDown,
-  Download,
-  FolderArchive,
-  MoreVertical,
-  Search,
-  Share2,
-  SlidersHorizontal,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, ArrowUpDown, Check, ChevronDown, Download, FolderArchive, MoreVertical, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { AnalysisResponse, HistoryItem, UploadContentPreview } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
@@ -31,7 +19,7 @@ type ShareModalState = {
 }
 type ToastState = {
   message: string
-  tone: 'success' | 'error'
+  tone: 'success' | 'error' | 'danger'
 }
 
 type HistoryRow = HistoryItem & {
@@ -272,22 +260,56 @@ function ModalShell({
   children: React.ReactNode
   onClose: () => void
 }) {
-  return (
-    <div className='fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 px-4'>
-      <div className='w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl'>
-        <div className='mb-5 flex items-start justify-between gap-4'>
-          <h2 className='text-xl font-semibold text-slate-950'>{title}</h2>
-          <button
-            type='button'
-            onClick={onClose}
-            className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700'
-          >
-            <X className='h-4 w-4' />
-          </button>
-        </div>
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      className='fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 px-4'
+      onClick={onClose}
+    >
+      <div
+        className='w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl'
+        onClick={(event) => event.stopPropagation()}
+      >
+        {title ? (
+          <div className='mb-5 flex items-start justify-between gap-4'>
+            <h2 className='text-xl font-semibold text-slate-950'>{title}</h2>
+            <button
+              type='button'
+              onClick={onClose}
+              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700'
+            >
+              <X className='h-4 w-4' />
+            </button>
+          </div>
+        ) : (
+          <div className='mb-2 flex justify-end'>
+            <button
+              type='button'
+              onClick={onClose}
+              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700'
+            >
+              <X className='h-4 w-4' />
+            </button>
+          </div>
+        )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -312,6 +334,7 @@ export default function HistoryPage() {
     copied: false,
     sent: false,
   })
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [showArchivedOnly, setShowArchivedOnly] = useState(false)
@@ -436,37 +459,36 @@ export default function HistoryPage() {
 
   const handleDeleteSelected = () => {
     if (selectedRows.length === 0) return
-    const confirmed = window.confirm(
-      `Delete ${selectedRows.length} neural file${selectedRows.length === 1 ? '' : 's'}? This cannot be undone.`
-    )
-    if (!confirmed) return
+    setDeleteModalOpen(true)
+  }
 
+  const confirmDeleteSelected = () => {
+    if (selectedRows.length === 0) {
+      setDeleteModalOpen(false)
+      return
+    }
     const idsToDelete = [...selectedIds]
     const previousHistory = history
     const previousArchivedIds = archivedIds
 
     setError('')
     setToast(null)
+    setDeleteModalOpen(false)
     setHistory((current) => current.filter((item) => !idsToDelete.includes(item.upload_id)))
     setArchivedIds((current) => current.filter((id) => !idsToDelete.includes(id)))
     setSelectedIds([])
+    setToast({
+      message: `${idsToDelete.length} file${idsToDelete.length === 1 ? '' : 's'} removed from system.`,
+      tone: 'danger',
+    })
 
     const realIds = selectedRows.filter((item) => !item.isSample).map((item) => item.upload_id)
     if (realIds.length === 0) {
-      setToast({
-        message: `${idsToDelete.length} neural file${idsToDelete.length === 1 ? '' : 's'} removed from system.`,
-        tone: 'success',
-      })
       return
     }
 
     void api.deleteHistoryItems(realIds)
-      .then(() => {
-        setToast({
-          message: `${idsToDelete.length} neural file${idsToDelete.length === 1 ? '' : 's'} removed from system.`,
-          tone: 'success',
-        })
-      })
+      .then(() => {})
       .catch(() => {
         setHistory(previousHistory)
         setArchivedIds(previousArchivedIds)
@@ -570,23 +592,77 @@ export default function HistoryPage() {
       </header>
 
       <section className='flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/88 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
-        <div className='relative w-full max-w-xl'>
-          <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
-          <input
-            type='text'
-            placeholder='Search neural files...'
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className='h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100'
-          />
+        <div className='flex w-full max-w-4xl flex-col gap-3 lg:flex-row lg:items-center'>
+          <div className='relative w-full max-w-xl'>
+            <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
+            <input
+              type='text'
+              placeholder='Search files...'
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className='h-10 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100'
+            />
+          </div>
+
+          {toast ? (
+            <div
+              className={`rounded-xl border px-4 py-2.5 text-sm lg:min-w-[280px] ${
+                toast.tone === 'success'
+                  ? 'border-emerald-200/80 bg-emerald-50 text-emerald-800'
+                  : toast.tone === 'danger'
+                    ? 'border-rose-200/80 bg-rose-50 text-rose-800'
+                    : 'border-rose-200/80 bg-rose-50 text-rose-800'
+              }`}
+            >
+              {toast.message}
+            </div>
+          ) : null}
         </div>
 
-        <div className='flex items-center gap-2 self-end sm:self-auto'>
+        <div className='flex flex-wrap items-center justify-end gap-2 self-end sm:self-auto'>
+          {selectedCount > 0 ? (
+            <>
+              <div className='inline-flex h-8 items-center gap-2 px-1 text-sm font-semibold text-slate-900'>
+                <button
+                  type='button'
+                  onClick={() => setSelectedIds([])}
+                  className='inline-flex h-5 w-5 items-center justify-center rounded border border-indigo-500 bg-indigo-600 text-white transition hover:bg-indigo-700'
+                  title='Clear selected items'
+                  aria-label='Clear selected items'
+                >
+                  <Check className='h-3.5 w-3.5' />
+                </button>
+                <span>{selectedCount} selected</span>
+              </div>
+              <span className='hidden h-8 w-px bg-slate-200 sm:block' aria-hidden='true' />
+            </>
+          ) : null}
+
+          <button
+            type='button'
+            onClick={() => void handleDownloadSelected()}
+            disabled={downloading || selectedCount === 0}
+            className='inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50'
+            title='Download selected items'
+          >
+            <Download className='h-4 w-4' />
+          </button>
+
+          <button
+            type='button'
+            onClick={handleDeleteSelected}
+            disabled={selectedCount === 0}
+            className='inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50'
+            title='Delete selected items'
+          >
+            <Trash2 className='h-4 w-4' />
+          </button>
+
           <div className='relative'>
             <button
               type='button'
               onClick={() => setStatusMenuOpen((current) => !current)}
-              className='inline-flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
+              className='inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
             >
               <SlidersHorizontal className='h-4 w-4' />
               <span>Status</span>
@@ -628,7 +704,7 @@ export default function HistoryPage() {
           <button
             type='button'
             onClick={() => setSortNewest((current) => !current)}
-            className='inline-flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
+            className='inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
             title={`Current sort: ${sortNewest ? 'Newest first' : 'Oldest first'}`}
           >
             <ArrowUpDown className='h-4 w-4' />
@@ -639,70 +715,8 @@ export default function HistoryPage() {
 
       {!loading && history.length === 0 ? (
         <div className='rounded-2xl border border-indigo-200/80 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900'>
-          Showing sample neural files until your first upload arrives.
+          Showing sample files until your first upload arrives.
         </div>
-      ) : null}
-
-      {toast ? (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            toast.tone === 'success'
-              ? 'border-emerald-200/80 bg-emerald-50 text-emerald-800'
-              : 'border-rose-200/80 bg-rose-50 text-rose-800'
-          }`}
-        >
-          {toast.message}
-        </div>
-      ) : null}
-
-      {selectedCount > 0 ? (
-        <section className='flex flex-col gap-3 rounded-2xl border border-purple-200/80 bg-purple-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='flex items-center gap-3 text-sm font-medium text-slate-800'>
-            <input
-              type='checkbox'
-              checked
-              readOnly
-              className='h-4 w-4 rounded border-slate-300 accent-indigo-600'
-            />
-            <span>{selectedCount} items selected</span>
-          </div>
-
-          <div className='flex items-center gap-2'>
-            <button
-              type='button'
-              onClick={showArchivedOnly ? handleRestoreSelected : handleArchiveSelected}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-purple-200 bg-white/80 text-slate-700 transition hover:bg-slate-100'
-              title={showArchivedOnly ? 'Restore selected items' : 'Archive selected items'}
-            >
-              {showArchivedOnly ? <ArchiveRestore className='h-4 w-4' /> : <FolderArchive className='h-4 w-4' />}
-            </button>
-            <button
-              type='button'
-              onClick={() => void handleDownloadSelected()}
-              disabled={downloading}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-purple-200 bg-white/80 text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60'
-              title='Download selected items'
-            >
-              <Download className='h-4 w-4' />
-            </button>
-            <button
-              type='button'
-              onClick={handleOpenShareModal}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-purple-200 bg-white/80 text-slate-700 transition hover:bg-slate-100'
-              title='Share selected items'
-            >
-              <Share2 className='h-4 w-4' />
-            </button>
-            <button
-              type='button'
-              onClick={handleDeleteSelected}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white/80 text-rose-600 transition hover:bg-rose-50'
-              title='Delete selected items'
-            >
-              <Trash2 className='h-4 w-4' />
-            </button>
-          </div>
-        </section>
       ) : null}
 
       {error ? (
@@ -760,7 +774,7 @@ export default function HistoryPage() {
                 {filteredHistory.length === 0 ? (
                   <tr>
                     <td colSpan={4} className='px-6 py-14 text-center text-sm text-slate-500'>
-                      No neural files match your current filters.
+                      No files match your current filters.
                     </td>
                   </tr>
                 ) : (
@@ -917,6 +931,43 @@ export default function HistoryPage() {
                 Share invitation prepared for {shareModal.email}.
               </p>
             ) : null}
+          </div>
+        </ModalShell>
+      ) : null}
+
+      {deleteModalOpen ? (
+        <ModalShell title='' onClose={() => setDeleteModalOpen(false)}>
+          <div className='space-y-6'>
+            <div className='space-y-4'>
+              <div className='flex items-start gap-3'>
+                <span className='inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600'>
+                  <AlertTriangle className='h-6 w-6' />
+                </span>
+                <div className='space-y-2'>
+                  <h2 className='text-3xl font-semibold tracking-tight text-slate-950'>Delete Files?</h2>
+                  <p className='text-base leading-7 text-slate-600'>
+                    Are you sure you want to delete {selectedRows.length} selected file{selectedRows.length === 1 ? '' : 's'}? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className='flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+              <button
+                type='button'
+                onClick={() => setDeleteModalOpen(false)}
+                className='inline-flex h-14 items-center justify-center rounded-full border border-rose-100 bg-white px-8 text-base font-medium text-slate-700 transition hover:bg-slate-50 sm:min-w-[180px]'
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={confirmDeleteSelected}
+                className='inline-flex h-14 items-center justify-center rounded-full bg-indigo-950 px-8 text-base font-semibold text-white shadow-lg shadow-indigo-950/15 transition hover:bg-indigo-900 sm:min-w-[180px]'
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </ModalShell>
       ) : null}

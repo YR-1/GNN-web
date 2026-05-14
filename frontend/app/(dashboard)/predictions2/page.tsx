@@ -25,10 +25,14 @@ const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_impo
 const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_3d.html',
+  picseq: '/static/brain_plots/picseq_importance_3d.html',
+  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
+  picseq: '/static/brain_plots/picseq_importance_4panel.png',
+  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
 }
 
 function normalizeScoreId(value: string): string {
@@ -37,8 +41,8 @@ function normalizeScoreId(value: string): string {
 
 function toCanonicalScoreId(value: string): string {
   const alias: Record<string, string> = {
-    emotion_score: 'emotion_recognition',
-    emotion: 'emotion_recognition',
+    emotion_score: 'emotsupp_unadj',
+    emotion: 'emotsupp_unadj',
     attention: 'sustained_attention',
     wm: 'listsort_ageadj',
     working_memory: 'listsort_ageadj',
@@ -126,9 +130,14 @@ function buildFocusedTimeSeries(
 const METRIC_BAR_ACCENTS: Record<string, string> = {
   listsort_ageadj: '#7c3aed',
   pmat: '#a855f7',
-  sustained_attention: '#ec4899',
-  emotion_recognition: '#ef4444',
+  picseq: '#0f766e',
+  emotsupp_unadj: '#ef4444',
   sleep_quality: '#f97316',
+}
+
+const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'sleep_quality']
+const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
+  sustained_attention: 'picseq',
 }
 
 export default function Predictions2Page() {
@@ -143,6 +152,7 @@ export default function Predictions2Page() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
+  const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -251,13 +261,15 @@ export default function Predictions2Page() {
     return values
   }, [results?.correlation_matrix, results?.model_registry, modelPredictions])
 
+  const effectiveSelectedScoreId = selectedScoreId ? PREDICTIONS2_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
+
   const selectedScore = useMemo(
     () =>
-      SCORE_REGISTRY.find((score) => score.id === selectedScoreId) ??
+      SCORE_REGISTRY.find((score) => score.id === effectiveSelectedScoreId) ??
       SCORE_REGISTRY.find((score) => score.id === PRIMARY_VISUAL_SCORE_ID) ??
       SCORE_REGISTRY[0] ??
       null,
-    [selectedScoreId]
+    [effectiveSelectedScoreId]
   )
 
   const selectedScoreResult = selectedScore ? predictedValues[selectedScore.id] : null
@@ -277,9 +289,7 @@ export default function Predictions2Page() {
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
-  const metricScores = SCORE_REGISTRY.filter((score) =>
-    ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotion_recognition', 'sleep_quality'].includes(score.id)
-  )
+  const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
@@ -299,6 +309,11 @@ export default function Predictions2Page() {
   const currentBrainTitle = selectedImportanceBrainUrl
     ? `Global ${selectedScore?.shortName ?? 'score'} model importance brain`
     : '3D Brain Connectivity Map'
+  const isImportanceBrainLoading = Boolean(selectedImportanceBrainUrl) && selectedImportanceBrainUrl !== loadedImportanceBrainUrl
+
+  useEffect(() => {
+    setLoadedImportanceBrainUrl(null)
+  }, [selectedImportanceBrainUrl])
 
   if (error) {
     return (
@@ -357,12 +372,25 @@ export default function Predictions2Page() {
               <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
                 <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
                   {selectedImportanceBrainUrl ? (
-                    <iframe
-                      title={currentBrainTitle}
-                      src={selectedImportanceBrainUrl}
-                      className='h-full min-h-[15rem] w-full border-0'
-                      sandbox='allow-scripts allow-same-origin'
-                    />
+                    <div className='relative h-full min-h-[15rem]'>
+                      {isImportanceBrainLoading && (
+                        <div className='absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-slate-600'>
+                          <div className='text-center'>
+                            <div className='loading-spinner mx-auto mb-3' />
+                            <p>Loading selected brain plot...</p>
+                          </div>
+                        </div>
+                      )}
+                      <iframe
+                        title={currentBrainTitle}
+                        src={selectedImportanceBrainUrl}
+                        onLoad={() => setLoadedImportanceBrainUrl(selectedImportanceBrainUrl)}
+                        className={`h-full w-full border-0 transition-opacity ${
+                          isImportanceBrainLoading ? 'opacity-0' : 'opacity-100'
+                        }`}
+                        sandbox='allow-scripts allow-same-origin'
+                      />
+                    </div>
                   ) : results.nilearn_connectome_html ? (
                     <iframe
                       title={currentBrainTitle}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SCORE_CATEGORIES, SCORE_REGISTRY, getScoresByCategory, ScoreDefinition } from '@/lib/score-registry'
 import { SimulatedScoreResult } from '@/lib/score-simulator'
 import { computeScoreTopLinks } from '@/lib/score-links'
@@ -57,6 +57,7 @@ export default function BrainVisualizationPanel({
   const [topK, setTopK] = useState(10)
   const [minR, setMinR] = useState(0)
   const [showDetails, setShowDetails] = useState(false)
+  const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
 
   const selectedScore = useMemo(
     () => SCORE_REGISTRY.find((s) => s.id === selectedScoreId) ?? null,
@@ -80,6 +81,11 @@ export default function BrainVisualizationPanel({
 
   const result = selectedScore ? predictedValues[selectedScore.id] : null
   const showImportanceBrain = Boolean(importanceBrainUrl)
+  const isImportanceBrainLoading = showImportanceBrain && importanceBrainUrl !== loadedImportanceBrainUrl
+
+  useEffect(() => {
+    setLoadedImportanceBrainUrl(null)
+  }, [importanceBrainUrl])
 
   return (
     <div className='surface-card space-y-3'>
@@ -165,19 +171,31 @@ export default function BrainVisualizationPanel({
       {/* 3D Connectome */}
       <div className='rounded-xl border border-brand-400/20 bg-white/82 overflow-hidden'>
         {showImportanceBrain && importanceBrainUrl ? (
-          <iframe
-            title={`Global ${selectedScore?.shortName ?? 'score'} model importance brain`}
-            src={importanceBrainUrl}
-            className='w-full border-0'
-            style={{ height: '500px' }}
-            sandbox='allow-scripts allow-same-origin'
-          />
+          <div className='relative h-[500px]'>
+            {isImportanceBrainLoading && (
+              <div className='absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-ink-700'>
+                <div className='text-center'>
+                  <div className='loading-spinner mx-auto mb-3' />
+                  <p>Loading selected brain plot...</p>
+                </div>
+              </div>
+            )}
+            <iframe
+              title={`Global ${selectedScore?.shortName ?? 'score'} model importance brain`}
+              src={importanceBrainUrl}
+              onLoad={() => setLoadedImportanceBrainUrl(importanceBrainUrl)}
+              className={`h-full w-full border-0 transition-opacity ${isImportanceBrainLoading ? 'opacity-0' : 'opacity-100'}`}
+              loading='lazy'
+              sandbox='allow-scripts allow-same-origin'
+            />
+          </div>
         ) : connectomeHtml ? (
           <iframe
             title={`Connectome for ${selectedScore?.shortName ?? 'brain'}`}
             srcDoc={connectomeHtml}
             className='w-full border-0'
             style={{ height: '400px' }}
+            loading='lazy'
             sandbox='allow-scripts allow-same-origin'
           />
         ) : (

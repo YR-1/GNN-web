@@ -20,6 +20,8 @@ DEFAULT_STATIC_OUTPUT = ROOT / "static" / "brain_plots" / "listsort_importance_4
 
 TOP_K_3D_NODES = 15
 TOP_K_3D_EDGES = 30
+PMAT_TOP_K_3D_EDGES = 15
+PMAT_TOP_K_STATIC_EDGES = 30
 TOP_K_STATIC_NODES = TOP_K_3D_NODES
 TOP_K_STATIC_EDGES = TOP_K_3D_EDGES
 NODE_INTENSITY_COLORSCALE = [
@@ -91,6 +93,11 @@ def _edge_weight(edge: dict[str, Any]) -> float:
     return float(edge.get("weight", edge.get("edge_grad", edge.get("_edge_score", 0.0))))
 
 
+def _is_pmat_importance(importance_json: Path, importance_payload: dict[str, Any]) -> bool:
+    score_id = str(importance_payload.get("score_id", "")).strip().lower()
+    return score_id == "pmat" or "pmat" in importance_json.stem.lower()
+
+
 def _normalise_edge_type(edge: dict[str, Any], source_category: str, target_category: str) -> str:
     edge_type = str(edge.get("edge_type", "")).strip().lower()
     if edge_type in {"within", "within-category"}:
@@ -123,8 +130,55 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
     for node, size in zip(importance_nodes, node_sizes):
         node["_node_size"] = float(size)
 
-    top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_3D_NODES]
-    shown_rois = {int(node["id"]) for node in top_nodes}
+    dedicated_edge_key = next(
+        (key for key in ("plot_edges", "edges_3d", "edges_among_top_nodes") if importance_payload.get(key)),
+        None,
+    )
+    edge_candidates = importance_payload.get(dedicated_edge_key or "edges", [])
+    has_dedicated_plot_edges = dedicated_edge_key is not None
+    edge_source_label = "dedicated 3D plot edges" if has_dedicated_plot_edges else "top overall edges"
+    using_overall_edge_fallback = False
+
+    if _is_pmat_importance(importance_json, importance_payload):
+        edge_plot = [
+            {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+            for edge in edge_candidates
+        ]
+        if not edge_plot:
+            using_overall_edge_fallback = True
+            edge_plot = [
+                {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+                for edge in importance_payload.get("edges", [])
+            ]
+        edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:PMAT_TOP_K_3D_EDGES]
+        shown_rois = sorted(
+            {int(edge["_source"]) for edge in edge_plot} | {int(edge["_target"]) for edge in edge_plot}
+        )
+        top_nodes = [node for node in importance_nodes if int(node["id"]) in shown_rois]
+        edge_source_label = "PMAT top edges"
+    else:
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_3D_NODES]
+        shown_rois = {int(node["id"]) for node in top_nodes}
+
+        edge_plot = []
+        for edge in edge_candidates:
+            source = _edge_source(edge)
+            target = _edge_target(edge)
+            if has_dedicated_plot_edges or (source in shown_rois and target in shown_rois):
+                edge_plot.append({**edge, "_source": source, "_target": target, "_edge_score": _edge_weight(edge)})
+
+        if not edge_plot:
+            using_overall_edge_fallback = True
+            edge_plot = [
+                {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+                for edge in importance_payload.get("edges", [])
+            ]
+        edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_3D_EDGES]
+
+    if not top_nodes:
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_3D_NODES]
+        shown_rois = {int(node["id"]) for node in top_nodes}
+
     categories = sorted({_clean_category(node["_category"]) for node in top_nodes})
 
     color_min = min(float(node["score"]) for node in top_nodes)
@@ -135,30 +189,6 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
         else:
             node["_node_color01_local"] = (float(node["score"]) - color_min) / (color_max - color_min)
 
-    dedicated_edge_key = next(
-        (key for key in ("plot_edges", "edges_3d", "edges_among_top_nodes") if importance_payload.get(key)),
-        None,
-    )
-    edge_candidates = importance_payload.get(dedicated_edge_key or "edges", [])
-    has_dedicated_plot_edges = dedicated_edge_key is not None
-    edge_source_label = "dedicated 3D plot edges" if has_dedicated_plot_edges else "top overall edges"
-
-    edge_plot = []
-    using_overall_edge_fallback = False
-    for edge in edge_candidates:
-        source = _edge_source(edge)
-        target = _edge_target(edge)
-        if has_dedicated_plot_edges or (source in shown_rois and target in shown_rois):
-            edge_plot.append({**edge, "_source": source, "_target": target, "_edge_score": _edge_weight(edge)})
-
-    if not edge_plot:
-        using_overall_edge_fallback = True
-        edge_plot = [
-            {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
-            for edge in importance_payload.get("edges", [])
-        ]
-
-    edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_3D_EDGES]
     edge_widths = _norm((abs(float(edge["_edge_score"])) for edge in edge_plot), 1.2, 9.0)
     for edge, width in zip(edge_plot, edge_widths):
         source_node = atlas_nodes[int(edge["_source"])]
@@ -383,7 +413,48 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
     for node, size in zip(importance_nodes, node_sizes):
         node["_node_size"] = float(size)
 
-    top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_STATIC_NODES]
+    dedicated_edge_key = next(
+        (key for key in ("plot_edges", "edges_3d", "edges_among_top_nodes") if importance_payload.get(key)),
+        None,
+    )
+    edge_candidates = importance_payload.get(dedicated_edge_key or "edges", [])
+
+    if _is_pmat_importance(importance_json, importance_payload):
+        edge_plot = [
+            {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+            for edge in edge_candidates
+        ]
+        if not edge_plot:
+            edge_plot = [
+                {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+                for edge in importance_payload.get("edges", [])
+            ]
+        edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:PMAT_TOP_K_STATIC_EDGES]
+        shown_rois = sorted(
+            {int(edge["_source"]) for edge in edge_plot} | {int(edge["_target"]) for edge in edge_plot}
+        )
+        top_nodes = [node for node in importance_nodes if int(node["id"]) in shown_rois]
+    else:
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_STATIC_NODES]
+        shown_rois = {int(node["id"]) for node in top_nodes}
+        edge_plot = []
+
+        for edge in edge_candidates:
+            source = _edge_source(edge)
+            target = _edge_target(edge)
+            if dedicated_edge_key or (source in shown_rois and target in shown_rois):
+                edge_plot.append({**edge, "_source": source, "_target": target, "_edge_score": _edge_weight(edge)})
+
+        if not edge_plot:
+            edge_plot = [
+                {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
+                for edge in importance_payload.get("edges", [])
+            ]
+        edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_STATIC_EDGES]
+
+    if not top_nodes:
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_STATIC_NODES]
+
     color_min = min(float(node["score"]) for node in top_nodes)
     color_max = max(float(node["score"]) for node in top_nodes)
     for node in top_nodes:
@@ -392,27 +463,6 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
         else:
             node["_node_color01_local"] = (float(node["score"]) - color_min) / (color_max - color_min)
 
-    dedicated_edge_key = next(
-        (key for key in ("plot_edges", "edges_3d", "edges_among_top_nodes") if importance_payload.get(key)),
-        None,
-    )
-    edge_candidates = importance_payload.get(dedicated_edge_key or "edges", [])
-    shown_rois = {int(node["id"]) for node in top_nodes}
-    edge_plot = []
-
-    for edge in edge_candidates:
-        source = _edge_source(edge)
-        target = _edge_target(edge)
-        if dedicated_edge_key or (source in shown_rois and target in shown_rois):
-            edge_plot.append({**edge, "_source": source, "_target": target, "_edge_score": _edge_weight(edge)})
-
-    if not edge_plot:
-        edge_plot = [
-            {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
-            for edge in importance_payload.get("edges", [])
-        ]
-
-    edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_STATIC_EDGES]
     for edge in edge_plot:
         source_node = atlas_nodes[int(edge["_source"])]
         target_node = atlas_nodes[int(edge["_target"])]
@@ -587,7 +637,7 @@ def main() -> None:
         str(args.output),
         include_plotlyjs=include_plotlyjs,
         config={
-            "displayModeBar": False,
+            "displayModeBar": True,
             "displaylogo": False,
             "responsive": True,
         },

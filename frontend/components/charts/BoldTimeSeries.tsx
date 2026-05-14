@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { TimeSeriesPayload } from '@/lib/types'
+import { loadPlotly } from '@/lib/load-plotly'
 
 interface BoldTimeSeriesProps {
   timeSeries?: TimeSeriesPayload
@@ -50,7 +51,7 @@ export function BoldTimeSeries({
     let cancelled = false
 
     const renderPlot = async () => {
-      const { default: Plotly } = await import('plotly.js-dist-min')
+      const Plotly = await loadPlotly()
       if (cancelled || !plotRef.current) return
 
       plotlyRef.current = Plotly

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAnalysisStore } from '@/lib/store'
 import { AnalysisResponse } from '@/lib/types'
+import React from 'react'
 
 type ExecutionStatusValue = 'queued' | 'processing' | 'completed' | 'failed'
 
@@ -25,9 +26,9 @@ const fallbackStatusMessage: Record<ExecutionStatusValue, string> = {
 export default function AnalysisLoadingPage({
   params,
 }: {
-  params: { executionId: string }
+  params: Promise<{ executionId: string }>
 }) {
-  const { executionId } = params
+  const { executionId } = React.use(params)
   const router = useRouter()
   const searchParams = useSearchParams()
   const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)

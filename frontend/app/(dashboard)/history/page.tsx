@@ -446,6 +446,7 @@ export default function HistoryPage() {
     setSelectedIds([])
     setToast({ message: 'Items moved to archive.', tone: 'success' })
   }
+  void handleArchiveSelected
 
   const handleRestoreSelected = () => {
     if (selectedRows.length === 0) return
@@ -503,7 +504,7 @@ export default function HistoryPage() {
     if (selectedRows.length === 0) return
     setShareModal({ open: true, email: '', copied: false, sent: false })
   }
-
+  void handleOpenShareModal
   const handleCopyShareLink = async () => {
     if (!shareLink) return
     try {
@@ -513,6 +514,8 @@ export default function HistoryPage() {
       setError('Unable to copy the shareable link.')
     }
   }
+  void handleRestoreSelected
+
 
   const handleSendShare = () => {
     if (!shareModal.email.trim()) return

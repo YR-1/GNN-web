@@ -25,11 +25,13 @@ const LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = '/static/brain_plots/listsort_impo
 const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_3d.html',
+  picseq: '/static/brain_plots/picseq_importance_3d.html',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
+  picseq: '/static/brain_plots/picseq_importance_4panel.png',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
 }
 
@@ -128,9 +130,14 @@ function buildFocusedTimeSeries(
 const METRIC_BAR_ACCENTS: Record<string, string> = {
   listsort_ageadj: '#7c3aed',
   pmat: '#a855f7',
-  sustained_attention: '#ec4899',
+  picseq: '#0f766e',
   emotsupp_unadj: '#ef4444',
   sleep_quality: '#f97316',
+}
+
+const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'sleep_quality']
+const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
+  sustained_attention: 'picseq',
 }
 
 export default function Predictions2Page() {
@@ -254,13 +261,15 @@ export default function Predictions2Page() {
     return values
   }, [results?.correlation_matrix, results?.model_registry, modelPredictions])
 
+  const effectiveSelectedScoreId = selectedScoreId ? PREDICTIONS2_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
+
   const selectedScore = useMemo(
     () =>
-      SCORE_REGISTRY.find((score) => score.id === selectedScoreId) ??
+      SCORE_REGISTRY.find((score) => score.id === effectiveSelectedScoreId) ??
       SCORE_REGISTRY.find((score) => score.id === PRIMARY_VISUAL_SCORE_ID) ??
       SCORE_REGISTRY[0] ??
       null,
-    [selectedScoreId]
+    [effectiveSelectedScoreId]
   )
 
   const selectedScoreResult = selectedScore ? predictedValues[selectedScore.id] : null
@@ -280,9 +289,7 @@ export default function Predictions2Page() {
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
-  const metricScores = SCORE_REGISTRY.filter((score) =>
-    ['listsort_ageadj', 'pmat', 'sustained_attention', 'emotsupp_unadj', 'sleep_quality'].includes(score.id)
-  )
+  const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 

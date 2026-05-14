@@ -185,6 +185,7 @@ export default function BrainVisualizationPanel({
               src={importanceBrainUrl}
               onLoad={() => setLoadedImportanceBrainUrl(importanceBrainUrl)}
               className={`h-full w-full border-0 transition-opacity ${isImportanceBrainLoading ? 'opacity-0' : 'opacity-100'}`}
+              loading='lazy'
               sandbox='allow-scripts allow-same-origin'
             />
           </div>
@@ -194,6 +195,7 @@ export default function BrainVisualizationPanel({
             srcDoc={connectomeHtml}
             className='w-full border-0'
             style={{ height: '400px' }}
+            loading='lazy'
             sandbox='allow-scripts allow-same-origin'
           />
         ) : (

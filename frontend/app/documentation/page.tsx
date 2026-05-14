@@ -13,8 +13,9 @@ const NAV_ITEMS = [
   { href: '/documentation', label: 'Documentation', protected: false },
 ]
 
-export default function PublicDocumentationPage() {
-  const token = cookies().get('token')?.value
+export default async function PublicDocumentationPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('token')?.value
 
   return (
     <div className='app-bg'>

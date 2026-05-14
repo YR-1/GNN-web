@@ -24,6 +24,24 @@ PMAT_TOP_K_3D_EDGES = 15
 PMAT_TOP_K_STATIC_EDGES = 30
 TOP_K_STATIC_NODES = TOP_K_3D_NODES
 TOP_K_STATIC_EDGES = TOP_K_3D_EDGES
+ORIGINAL_PLOTLY_LAYOUT = dict(
+    updatemenu_y=0.86,
+    legend_y=0.72,
+    margin=dict(l=0, r=0, t=42, b=0),
+    height=340,
+    default_height="340px",
+    display_mode_bar=True,
+    show_title=True,
+)
+PMAT_PLOTLY_LAYOUT = dict(
+    updatemenu_y=0.86,
+    legend_y=0.72,
+    margin=dict(l=0, r=0, t=42, b=0),
+    height=340,
+    default_height="340px",
+    display_mode_bar=True,
+    show_title=True,
+)
 NODE_INTENSITY_COLORSCALE = [
     [0.0, "#eeeeee"],
     [0.35, "#fff2a8"],
@@ -38,6 +56,7 @@ EDGE_LABELS = {
     "between-category": "Across categories",
     "within-category": "Within category",
 }
+BRAIN_CAMERA_EYE = dict(x=0.0, y=1.18, z=0.74)
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -107,9 +126,16 @@ def _normalise_edge_type(edge: dict[str, Any], source_category: str, target_cate
     return "within-category" if source_category == target_category else "between-category"
 
 
-def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
+def build_figure(
+    nodes_json: Path,
+    importance_json: Path,
+    *,
+    plot_title: str = "ListSort FBNetGen importance",
+) -> go.Figure:
     nodes_payload = _load_json(nodes_json)
     importance_payload = _load_json(importance_json)
+    is_pmat = _is_pmat_importance(importance_json, importance_payload)
+    plotly_layout = PMAT_PLOTLY_LAYOUT if is_pmat else ORIGINAL_PLOTLY_LAYOUT
 
     atlas_nodes = {int(node["id"]): node for node in nodes_payload["nodes"]}
     importance_nodes = []
@@ -139,7 +165,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
     edge_source_label = "dedicated 3D plot edges" if has_dedicated_plot_edges else "top overall edges"
     using_overall_edge_fallback = False
 
-    if _is_pmat_importance(importance_json, importance_payload):
+    if is_pmat:
         edge_plot = [
             {**edge, "_source": _edge_source(edge), "_target": _edge_target(edge), "_edge_score": _edge_weight(edge)}
             for edge in edge_candidates
@@ -346,19 +372,24 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
         buttons.append(dict(label=category, method="update", args=[{"visible": visible}]))
 
     fig = go.Figure(data=traces)
+    if plotly_layout["show_title"]:
+        source_suffix = f" from {edge_source_label}" if is_pmat else ""
+        endpoint_suffix = " (top-edge endpoints shown faintly)" if edge_endpoint_nodes else ""
+        fig.update_layout(
+            title=dict(
+                text=(
+                    f"{plot_title}: top {len(top_nodes)} nodes, top {len(edge_plot)} edges"
+                    + source_suffix
+                    + endpoint_suffix
+                ),
+                x=0.02,
+                y=0.98,
+                xanchor="left",
+                yanchor="top",
+                font=dict(size=14),
+            )
+        )
     fig.update_layout(
-        title=dict(
-            text=(
-                f"3D brain surface with Shen-268 importance graph: top {len(top_nodes)} nodes, top {len(edge_plot)} edges"
-                + f" from {edge_source_label}"
-                + (" (top-edge endpoints shown faintly)" if edge_endpoint_nodes else "")
-            ),
-            x=0.02,
-            y=0.98,
-            xanchor="left",
-            yanchor="top",
-            font=dict(size=14),
-        ),
         scene=dict(
             xaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             yaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
@@ -366,9 +397,9 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             bgcolor="rgba(0,0,0,0)",
             aspectmode="data",
             camera=dict(
-                eye=dict(x=0.0, y=1.08, z=0.68),
+                eye=BRAIN_CAMERA_EYE,
                 up=dict(x=0, y=0, z=1),
-                center=dict(x=0, y=0, z=-0.02),
+                center=dict(x=0, y=0, z=-0.07),
             ),
         ),
         updatemenus=[
@@ -376,7 +407,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
                 buttons=buttons,
                 direction="down",
                 x=0.06,
-                y=0.86,
+                y=plotly_layout["updatemenu_y"],
                 xanchor="left",
                 yanchor="top",
                 bgcolor="rgba(255,255,255,0.9)",
@@ -388,7 +419,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
         ],
         legend=dict(
             x=0.06,
-            y=0.72,
+            y=plotly_layout["legend_y"],
             xanchor="left",
             yanchor="top",
             bgcolor="rgba(255,255,255,0.88)",
@@ -396,8 +427,8 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             borderwidth=1,
             font=dict(size=11),
         ),
-        margin=dict(l=0, r=0, t=42, b=0),
-        height=340,
+        margin=plotly_layout["margin"],
+        height=plotly_layout["height"],
     )
     return fig
 
@@ -636,7 +667,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    fig = build_figure(args.nodes_json, args.importance_json)
+    importance_payload = _load_json(args.importance_json)
+    plotly_layout = PMAT_PLOTLY_LAYOUT if _is_pmat_importance(args.importance_json, importance_payload) else ORIGINAL_PLOTLY_LAYOUT
+    fig = build_figure(
+        args.nodes_json,
+        args.importance_json,
+        plot_title=args.plot_title,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     include_plotlyjs: str | bool
     if args.include_plotlyjs == "inline":
@@ -649,12 +686,12 @@ def main() -> None:
         str(args.output),
         include_plotlyjs=include_plotlyjs,
         config={
-            "displayModeBar": True,
+            "displayModeBar": plotly_layout["display_mode_bar"],
             "displaylogo": False,
             "responsive": True,
         },
         default_width="100%",
-        default_height="340px",
+        default_height=plotly_layout["default_height"],
     )
     html = args.output.read_text(encoding="utf-8")
     html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)

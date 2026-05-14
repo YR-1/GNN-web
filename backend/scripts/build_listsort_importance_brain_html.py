@@ -347,6 +347,18 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
 
     fig = go.Figure(data=traces)
     fig.update_layout(
+        title=dict(
+            text=(
+                f"3D brain surface with Shen-268 importance graph: top {len(top_nodes)} nodes, top {len(edge_plot)} edges"
+                + f" from {edge_source_label}"
+                + (" (top-edge endpoints shown faintly)" if edge_endpoint_nodes else "")
+            ),
+            x=0.02,
+            y=0.98,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=14),
+        ),
         scene=dict(
             xaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
             yaxis=dict(visible=False, showbackground=False, showgrid=False, zeroline=False, showticklabels=False, title=""),
@@ -364,7 +376,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
                 buttons=buttons,
                 direction="down",
                 x=0.06,
-                y=0.94,
+                y=0.86,
                 xanchor="left",
                 yanchor="top",
                 bgcolor="rgba(255,255,255,0.9)",
@@ -376,7 +388,7 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
         ],
         legend=dict(
             x=0.06,
-            y=0.82,
+            y=0.72,
             xanchor="left",
             yanchor="top",
             bgcolor="rgba(255,255,255,0.88)",
@@ -384,8 +396,8 @@ def build_figure(nodes_json: Path, importance_json: Path) -> go.Figure:
             borderwidth=1,
             font=dict(size=11),
         ),
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=300,
+        margin=dict(l=0, r=0, t=42, b=0),
+        height=340,
     )
     return fig
 
@@ -642,7 +654,7 @@ def main() -> None:
             "responsive": True,
         },
         default_width="100%",
-        default_height="300px",
+        default_height="340px",
     )
     html = args.output.read_text(encoding="utf-8")
     html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)

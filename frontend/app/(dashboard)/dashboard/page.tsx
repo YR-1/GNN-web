@@ -405,6 +405,7 @@ export default function DashboardPage() {
 
   const successRate =
     safeStats.totalUploads > 0 ? Math.round((safeStats.completed / safeStats.totalUploads) * 100) : 0
+  void successRate  // silence noUnusedLocals
 
   if (!selectedMetric) {
     return (
@@ -597,7 +598,7 @@ export default function DashboardPage() {
                         boxShadow: '0 18px 50px rgba(15,23,42,0.12)',
                         background: 'rgba(255,255,255,0.96)',
                       }}
-                      formatter={(value: number) => [`${value} participants`, 'Count']}
+                      formatter={(value) => [`${value} participants`, 'Count']}
                       labelFormatter={(_, payload) =>
                         payload?.[0]?.payload
                           ? `${payload[0].payload.rangeText} • ${payload[0].payload.percentile}`

@@ -1,5 +1,8 @@
 import asyncio
+import json
+import math
 import threading
+import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -37,6 +40,93 @@ class SupabaseDbService:
         until processing actually begins.
         """
         return "uploaded" if status == "queued" else status
+
+    @staticmethod
+    def _safe_float(value: Any) -> Optional[float]:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return None
+        return numeric if math.isfinite(numeric) else None
+
+    @staticmethod
+    def _normalize_json_dict(value: Any) -> Dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, dict) else {}
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _build_prediction_summary_rows(
+        self,
+        *,
+        execution_id: str,
+        upload_id: str,
+        user_id: str,
+        results: Dict[str, Any],
+        completed_at_iso: str,
+    ) -> List[Dict[str, Any]]:
+        predicted_scores = results.get("predicted_scores") or []
+        explained_scores = results.get("explained_scores") or []
+        if not isinstance(predicted_scores, list):
+            predicted_scores = []
+        if not isinstance(explained_scores, list):
+            explained_scores = []
+
+        explained_by_score: Dict[str, Dict[str, Any]] = {}
+        for explanation in explained_scores:
+            if not isinstance(explanation, dict):
+                continue
+            score_id = str(explanation.get("score_id") or "").strip().lower()
+            if score_id:
+                explained_by_score[score_id] = explanation
+
+        summary_rows: List[Dict[str, Any]] = []
+        for prediction in predicted_scores:
+            if not isinstance(prediction, dict):
+                continue
+            score_id = str(prediction.get("score_id") or "").strip().lower()
+            predicted_value = self._safe_float(prediction.get("value"))
+            if not score_id or predicted_value is None:
+                continue
+
+            explanation = explained_by_score.get(score_id, {})
+            roi_items = explanation.get("roi_importance") or []
+            if not isinstance(roi_items, list):
+                roi_items = []
+
+            top_regions = []
+            for roi in roi_items[:10]:
+                if not isinstance(roi, dict):
+                    continue
+                label = str(roi.get("label") or roi.get("roi_index") or "").strip()
+                importance = self._safe_float(roi.get("importance"))
+                if not label or importance is None:
+                    continue
+                top_regions.append({
+                    "name": label,
+                    "importance": importance,
+                })
+
+            summary_rows.append(
+                {
+                    "execution_id": execution_id,
+                    "upload_id": upload_id,
+                    "user_id": user_id,
+                    "score_id": score_id,
+                    "predicted_value": predicted_value,
+                    "completed_at": completed_at_iso,
+                    "top_regions": top_regions,
+                }
+            )
+
+        return summary_rows
 
     async def get_analysis_row(self, execution_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         def op():
@@ -186,6 +276,20 @@ class SupabaseDbService:
             if upload_id:
                 upload_status = self._map_execution_status_to_upload_status(status)
                 self.client.table("file_uploads").update({"status": upload_status}).eq("upload_id", upload_id).execute()
+                try:
+                    summary_rows = self._build_prediction_summary_rows(
+                        execution_id=execution_id,
+                        upload_id=str(upload_id),
+                        user_id=user_id,
+                        results=results,
+                        completed_at_iso=completed_at_iso,
+                    )
+                    self.client.table("prediction_summaries").delete().eq("execution_id", execution_id).eq("user_id", user_id).execute()
+                    if summary_rows:
+                        self.client.table("prediction_summaries").insert(summary_rows).execute()
+                except Exception:
+                    print("[prediction_summaries] Unable to persist summary rows; continuing without summary table update.")
+                    traceback.print_exc()
 
         await self._run(op)
 
@@ -280,6 +384,10 @@ async def delete_uploads(upload_ids: List[str], user_id: str) -> List[str]:
         if not found_ids:
             return []
 
+        try:
+            service.client.table("prediction_summaries").delete().eq("user_id", user_id).in_("upload_id", found_ids).execute()
+        except Exception:
+            pass
         service.client.table("model_executions").delete().eq("user_id", user_id).in_("upload_id", found_ids).execute()
         service.client.table("file_uploads").delete().eq("user_id", user_id).in_("upload_id", found_ids).execute()
 
@@ -356,9 +464,42 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
     service = await _get_db_service()
 
     def op():
+        metric_configs = {
+            "listsort_ageadj": {
+                "label": "ListSort (Age Adjusted)",
+                "shortLabel": "ListSort",
+                "range": [50.0, 150.0],
+                "defaultInsight": "Working-memory prediction is driven by frontoparietal coordination across the cohort.",
+            },
+            "pmat": {
+                "label": "PMAT (Fluid Intelligence)",
+                "shortLabel": "PMAT",
+                "range": [0.0, 24.0],
+                "defaultInsight": "Fluid reasoning aligns with executive-control and parietal integration patterns.",
+            },
+            "sustained_attention": {
+                "label": "Sustained Attention",
+                "shortLabel": "Attention",
+                "range": [0.0, 1.0],
+                "defaultInsight": "Attention performance tracks dorsal attention synchronization stability.",
+            },
+            "emotion_recognition": {
+                "label": "Emotion Recognition",
+                "shortLabel": "Emotion",
+                "range": [0.0, 100.0],
+                "defaultInsight": "Emotion recognition is associated with temporal-limbic and orbitofrontal coordination.",
+            },
+            "sleep_quality": {
+                "label": "Sleep Quality",
+                "shortLabel": "Sleep",
+                "range": [0.0, 21.0],
+                "defaultInsight": "Sleep-quality variation clusters around salience, limbic, and thalamic circuitry.",
+            },
+        }
+
         uploads_resp = (
             service.client.table("file_uploads")
-            .select("upload_id,created_at,status")
+            .select("upload_id,file_name,created_at,status")
             .eq("user_id", user_id)
             .execute()
         )
@@ -376,7 +517,6 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
         completed = [e for e in executions if e.get("status") == "completed"]
         pending = [e for e in executions if e.get("status") in ("queued", "processing")]
 
-        # Average processing time for completed executions
         durations = []
         for e in completed:
             created = e.get("created_at")
@@ -384,16 +524,105 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
             if created and finished:
                 try:
                     from datetime import datetime as dt
-                    t0 = dt.fromisoformat(created.replace("Z", "+00:00"))
-                    t1 = dt.fromisoformat(finished.replace("Z", "+00:00"))
+                    t0 = dt.fromisoformat(str(created).replace("Z", "+00:00"))
+                    t1 = dt.fromisoformat(str(finished).replace("Z", "+00:00"))
                     durations.append((t1 - t0).total_seconds())
                 except Exception:
                     pass
         avg_time = sum(durations) / len(durations) if durations else 0.0
 
-        # Recent activity (last 5)
-        sorted_uploads = sorted(uploads, key=lambda u: u.get("created_at", ""), reverse=True)
+        sorted_uploads = sorted(uploads, key=lambda u: str(u.get("created_at") or ""), reverse=True)
         recent = sorted_uploads[:5]
+
+        dashboard_metrics = []
+        try:
+            summary_resp = (
+                service.client.table("prediction_summaries")
+                .select("score_id,predicted_value,completed_at,top_regions")
+                .eq("user_id", user_id)
+                .order("completed_at", desc=False)
+                .execute()
+            )
+            summary_rows = summary_resp.data or []
+
+            metric_values: Dict[str, List[float]] = {metric_id: [] for metric_id in metric_configs}
+            metric_timeline: Dict[str, List[tuple[str, float]]] = {metric_id: [] for metric_id in metric_configs}
+            metric_region_scores: Dict[str, Dict[str, float]] = {metric_id: {} for metric_id in metric_configs}
+
+            for row in summary_rows:
+                if not isinstance(row, dict):
+                    continue
+                metric_id = str(row.get("score_id") or "").strip().lower()
+                if metric_id not in metric_configs:
+                    continue
+                value = self._safe_float(row.get("predicted_value"))
+                if value is None:
+                    continue
+                timeline_key = str(row.get("completed_at") or "")
+                metric_values[metric_id].append(value)
+                metric_timeline[metric_id].append((timeline_key, value))
+
+                top_regions = row.get("top_regions") or []
+                if not isinstance(top_regions, list):
+                    top_regions = []
+                for region in top_regions[:10]:
+                    if not isinstance(region, dict):
+                        continue
+                    label = str(region.get("name") or "").strip()
+                    importance = self._safe_float(region.get("importance"))
+                    if not label or importance is None:
+                        continue
+                    metric_region_scores[metric_id][label] = metric_region_scores[metric_id].get(label, 0.0) + importance
+
+            for metric_id, config in metric_configs.items():
+                values = metric_values[metric_id]
+                if not values:
+                    continue
+
+                ordered_values = [value for _, value in sorted(metric_timeline[metric_id], key=lambda item: item[0])]
+                midpoint = max(len(ordered_values) // 2, 1)
+                previous_values = ordered_values[:midpoint]
+                recent_values = ordered_values[midpoint:] or ordered_values[-1:]
+                previous_avg = sum(previous_values) / len(previous_values) if previous_values else ordered_values[0]
+                recent_avg = sum(recent_values) / len(recent_values)
+                trend = ((recent_avg - previous_avg) / previous_avg * 100.0) if previous_avg else 0.0
+
+                region_items = sorted(
+                    metric_region_scores[metric_id].items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )[:5]
+                max_region_score = region_items[0][1] if region_items else 1.0
+                top_regions = [
+                    {
+                        "name": name,
+                        "contribution": round((score / max_region_score) * 100, 1) if max_region_score > 0 else 0.0,
+                    }
+                    for name, score in region_items
+                ]
+
+                confidence = min(0.99, 0.72 + len(values) * 0.03)
+                dashboard_metrics.append(
+                    {
+                        "id": metric_id,
+                        "label": config["label"],
+                        "shortLabel": config["shortLabel"],
+                        "range": config["range"],
+                        "average": round(sum(values) / len(values), 3),
+                        "trend": round(trend, 3),
+                        "distribution": [round(value, 4) for value in sorted(values)],
+                        "cohortSplit": [round(previous_avg, 3), round(recent_avg, 3)],
+                        "confidence": round(confidence, 3),
+                        "reliability": "Observed cohort aggregate" if len(values) >= 3 else "Limited cohort aggregate",
+                        "insight": config["defaultInsight"],
+                        "topRegions": top_regions,
+                        "sampleSize": len(values),
+                    }
+                )
+        except Exception:
+            print("[dashboard] prediction_summaries unavailable; returning base dashboard stats only")
+            traceback.print_exc()
+            dashboard_metrics = []
 
         return {
             "total_uploads": total_uploads,
@@ -401,6 +630,70 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
             "pending_analyses": len(pending),
             "avg_processing_time": round(avg_time, 1),
             "recent_uploads": recent,
+            "dashboard_metrics": dashboard_metrics,
+        }
+
+    return await service._run(op)
+
+
+async def backfill_prediction_summaries(
+    user_id: str,
+    *,
+    batch_size: int = 50,
+    max_batches: int = 20,
+) -> Dict[str, Any]:
+    service = await _get_db_service()
+
+    def op():
+        total_rows = 0
+        processed_executions = 0
+        service.client.table("prediction_summaries").delete().eq("user_id", user_id).execute()
+
+        for batch_index in range(max_batches):
+            start = batch_index * batch_size
+            end = start + batch_size - 1
+            response = (
+                service.client.table("model_executions")
+                .select("execution_id,upload_id,completed_at,results")
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .order("completed_at", desc=False)
+                .range(start, end)
+                .execute()
+            )
+            executions = response.data or []
+            if not executions:
+                break
+
+            rows_to_insert: List[Dict[str, Any]] = []
+            for execution in executions:
+                execution_id = str(execution.get("execution_id") or "")
+                upload_id = str(execution.get("upload_id") or "")
+                completed_at = str(execution.get("completed_at") or datetime.utcnow().isoformat())
+                results = service._normalize_json_dict(execution.get("results"))
+                if not execution_id or not upload_id:
+                    continue
+                rows_to_insert.extend(
+                    service._build_prediction_summary_rows(
+                        execution_id=execution_id,
+                        upload_id=upload_id,
+                        user_id=user_id,
+                        results=results,
+                        completed_at_iso=completed_at,
+                    )
+                )
+                processed_executions += 1
+
+            if rows_to_insert:
+                service.client.table("prediction_summaries").insert(rows_to_insert).execute()
+                total_rows += len(rows_to_insert)
+
+            if len(executions) < batch_size:
+                break
+
+        return {
+            "processed_executions": processed_executions,
+            "inserted_summary_rows": total_rows,
         }
 
     return await service._run(op)

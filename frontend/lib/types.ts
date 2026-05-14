@@ -164,10 +164,34 @@ export interface RecentUpload {
 
 export interface DashboardStats {
   total_uploads: number
-  total_analyses: number
   completed_analyses: number
-  failed_analyses: number
+  pending_analyses: number
+  avg_processing_time: number
+  total_analyses?: number
+  failed_analyses?: number
   recent_uploads: RecentUpload[]
+  dashboard_metrics?: DashboardMetricAggregate[]
+}
+
+export interface DashboardMetricRegion {
+  name: string
+  contribution: number
+}
+
+export interface DashboardMetricAggregate {
+  id: string
+  label: string
+  shortLabel: string
+  range: [number, number]
+  average: number
+  trend: number
+  distribution: number[]
+  cohortSplit: [number, number]
+  confidence: number
+  reliability: string
+  insight: string
+  topRegions: DashboardMetricRegion[]
+  sampleSize: number
 }
 
 // ===== Authentication =====

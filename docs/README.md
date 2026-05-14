@@ -155,6 +155,18 @@ CREATE TABLE IF NOT EXISTS analysis_results (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Lightweight prediction summaries for dashboard aggregation
+CREATE TABLE IF NOT EXISTS prediction_summaries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  execution_id UUID NOT NULL REFERENCES model_executions ON DELETE CASCADE,
+  upload_id UUID NOT NULL REFERENCES file_uploads ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  score_id TEXT NOT NULL,
+  predicted_value DOUBLE PRECISION NOT NULL,
+  top_regions JSONB DEFAULT '[]'::jsonb,
+  completed_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_file_uploads_user_id ON file_uploads(user_id);
 CREATE INDEX IF NOT EXISTS idx_file_uploads_status ON file_uploads(status);
@@ -165,12 +177,17 @@ CREATE INDEX IF NOT EXISTS idx_model_executions_status ON model_executions(statu
 CREATE INDEX IF NOT EXISTS idx_model_executions_created_at ON model_executions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analysis_results_user_id ON analysis_results(user_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_results_execution_id ON analysis_results(execution_id);
+CREATE INDEX IF NOT EXISTS idx_prediction_summaries_user_id ON prediction_summaries(user_id);
+CREATE INDEX IF NOT EXISTS idx_prediction_summaries_score_id ON prediction_summaries(score_id);
+CREATE INDEX IF NOT EXISTS idx_prediction_summaries_completed_at ON prediction_summaries(completed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prediction_summaries_execution_id ON prediction_summaries(execution_id);
 
 -- Enable RLS
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE model_executions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analysis_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prediction_summaries ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies - User Profiles
 CREATE POLICY "Users can view own profile" ON user_profiles FOR SELECT USING (auth.uid() = id);
@@ -191,6 +208,11 @@ CREATE POLICY "Users can update own executions" ON model_executions FOR UPDATE U
 -- RLS Policies - Analysis Results
 CREATE POLICY "Users can view own results" ON analysis_results FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can create results" ON analysis_results FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies - Prediction Summaries
+CREATE POLICY "Users can view own prediction summaries" ON prediction_summaries FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create prediction summaries" ON prediction_summaries FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own prediction summaries" ON prediction_summaries FOR DELETE USING (auth.uid() = user_id);
 ```
 
 ### Optional: Create user_profiles after email confirmation

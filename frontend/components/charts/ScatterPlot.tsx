@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { ScatterPoint } from '@/lib/model-performance-data'
+import { loadPlotly } from '@/lib/load-plotly'
 
 interface ScatterPlotProps {
   data: ScatterPoint[]
@@ -19,7 +20,7 @@ export function ScatterPlot({ data, title, correlation }: ScatterPlotProps) {
     let cancelled = false
 
     const renderPlot = async () => {
-      const { default: Plotly } = await import('plotly.js-dist-min')
+      const Plotly = await loadPlotly()
       if (cancelled || !plotRef.current) return
 
       plotlyRef.current = Plotly

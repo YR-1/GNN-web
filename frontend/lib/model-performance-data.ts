@@ -61,7 +61,7 @@ export const modelPerformanceData: ModelPerformance[] = [
   },
   {
     id: 'emotion',
-    behavioralScore: 'Emotion Recognition',
+    behavioralScore: 'Emotion Support',
     correlation: 0.769,
     pValue: 0.00215,
     mse: 4.85,

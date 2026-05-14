@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { CorrelationResults } from '@/lib/types'
+import { loadPlotly } from '@/lib/load-plotly'
 
 interface CorrelationMatrixProps {
   data: CorrelationResults
@@ -44,7 +45,7 @@ export default function CorrelationMatrix({
     let cancelled = false
 
     const renderPlot = async () => {
-      const { default: Plotly } = await import('plotly.js-dist-min')
+      const Plotly = await loadPlotly()
       if (cancelled || !plotRef.current) return
 
       plotlyRef.current = Plotly

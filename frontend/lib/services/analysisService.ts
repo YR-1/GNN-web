@@ -18,10 +18,27 @@ export interface HistoryItem {
 
 export interface DashboardStats {
   total_uploads: number
-  total_analyses: number
   completed_analyses: number
-  failed_analyses: number
+  pending_analyses: number
+  avg_processing_time: number
+  total_analyses?: number
+  failed_analyses?: number
   recent_uploads: RecentUpload[]
+  dashboard_metrics?: Array<{
+    id: string
+    label: string
+    shortLabel: string
+    range: [number, number]
+    average: number
+    trend: number
+    distribution: number[]
+    cohortSplit: [number, number]
+    confidence: number
+    reliability: string
+    insight: string
+    topRegions: Array<{ name: string; contribution: number }>
+    sampleSize: number
+  }>
 }
 
 export interface RecentUpload {

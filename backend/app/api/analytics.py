@@ -19,6 +19,7 @@ from ..core.config import get_settings
 from ..core.model_registry import build_model_registry
 from ..services.model_service import process_txt_data
 from ..services.database import (
+    backfill_prediction_summaries,
     create_upload_and_execution,
     get_analysis_row,
     delete_uploads,
@@ -401,3 +402,16 @@ async def dashboard_stats(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not fetch dashboard stats: {exc}")
     return stats
+
+
+@router.post("/dashboard/backfill")
+async def backfill_dashboard_prediction_summaries(
+    token_data: dict = Depends(verify_token),
+):
+    """Backfill lightweight prediction summary rows from completed executions."""
+    user_id = token_data.get("sub")
+    try:
+        result = await backfill_prediction_summaries(user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not backfill dashboard summaries: {exc}")
+    return result

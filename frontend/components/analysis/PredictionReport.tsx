@@ -25,11 +25,13 @@ const PRIMARY_VISUAL_SCORE_ID = 'listsort_ageadj'
 const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: '/static/brain_plots/listsort_importance_3d.html',
   pmat: '/static/brain_plots/pmat_importance_3d.html',
+  picseq: '/static/brain_plots/picseq_importance_3d.html',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: '/static/brain_plots/listsort_importance_4panel.png',
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
+  picseq: '/static/brain_plots/picseq_importance_4panel.png',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
 }
 

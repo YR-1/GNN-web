@@ -84,6 +84,17 @@ def _clean_category(value: Any) -> str:
     return text
 
 
+def _node_importance_value(node: dict[str, Any]) -> float:
+    """Return display importance, preferring the schema-normalized node score."""
+    try:
+        value = float(node.get("score_norm"))
+        if np.isfinite(value):
+            return value
+    except (TypeError, ValueError):
+        pass
+    return abs(float(node["score"]))
+
+
 def _build_hover(node: dict[str, Any]) -> str:
     parts = [
         f"ROI {int(node['node_no'])}",
@@ -148,7 +159,7 @@ def build_figure(
             "score_norm": float(item["score_norm"]),
         }
         merged["_category"] = _clean_category(merged.get("network"))
-        merged["_node_magnitude"] = abs(float(merged["score"]))
+        merged["_node_magnitude"] = _node_importance_value(merged)
         importance_nodes.append(merged)
 
     importance_nodes.sort(key=lambda node: int(node["id"]))
@@ -183,7 +194,7 @@ def build_figure(
         top_nodes = [node for node in importance_nodes if int(node["id"]) in shown_rois]
         edge_source_label = "PMAT top edges"
     else:
-        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_3D_NODES]
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["_node_magnitude"]), reverse=True)[:TOP_K_3D_NODES]
         shown_rois = {int(node["id"]) for node in top_nodes}
 
         edge_plot = []
@@ -202,18 +213,18 @@ def build_figure(
         edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_3D_EDGES]
 
     if not top_nodes:
-        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_3D_NODES]
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["_node_magnitude"]), reverse=True)[:TOP_K_3D_NODES]
         shown_rois = {int(node["id"]) for node in top_nodes}
 
     categories = sorted({_clean_category(node["_category"]) for node in top_nodes})
 
-    color_min = min(float(node["score"]) for node in top_nodes)
-    color_max = max(float(node["score"]) for node in top_nodes)
+    color_min = min(float(node["_node_magnitude"]) for node in top_nodes)
+    color_max = max(float(node["_node_magnitude"]) for node in top_nodes)
     for node in top_nodes:
         if abs(color_max - color_min) < 1e-12:
             node["_node_color01_local"] = 0.5
         else:
-            node["_node_color01_local"] = (float(node["score"]) - color_min) / (color_max - color_min)
+            node["_node_color01_local"] = (float(node["_node_magnitude"]) - color_min) / (color_max - color_min)
 
     edge_widths = _norm((abs(float(edge["_edge_score"])) for edge in edge_plot), 1.2, 9.0)
     for edge, width in zip(edge_plot, edge_widths):
@@ -448,7 +459,7 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
             "score_norm": float(item["score_norm"]),
         }
         merged["_category"] = _clean_category(merged.get("network"))
-        merged["_node_magnitude"] = abs(float(merged["score"]))
+        merged["_node_magnitude"] = _node_importance_value(merged)
         importance_nodes.append(merged)
 
     importance_nodes.sort(key=lambda node: int(node["id"]))
@@ -478,7 +489,7 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
         )
         top_nodes = [node for node in importance_nodes if int(node["id"]) in shown_rois]
     else:
-        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_STATIC_NODES]
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["_node_magnitude"]), reverse=True)[:TOP_K_STATIC_NODES]
         shown_rois = {int(node["id"]) for node in top_nodes}
         edge_plot = []
 
@@ -496,15 +507,15 @@ def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[
         edge_plot = sorted(edge_plot, key=lambda edge: float(edge["_edge_score"]), reverse=True)[:TOP_K_STATIC_EDGES]
 
     if not top_nodes:
-        top_nodes = sorted(importance_nodes, key=lambda node: float(node["score"]), reverse=True)[:TOP_K_STATIC_NODES]
+        top_nodes = sorted(importance_nodes, key=lambda node: float(node["_node_magnitude"]), reverse=True)[:TOP_K_STATIC_NODES]
 
-    color_min = min(float(node["score"]) for node in top_nodes)
-    color_max = max(float(node["score"]) for node in top_nodes)
+    color_min = min(float(node["_node_magnitude"]) for node in top_nodes)
+    color_max = max(float(node["_node_magnitude"]) for node in top_nodes)
     for node in top_nodes:
         if abs(color_max - color_min) < 1e-12:
             node["_node_color01_local"] = 0.5
         else:
-            node["_node_color01_local"] = (float(node["score"]) - color_min) / (color_max - color_min)
+            node["_node_color01_local"] = (float(node["_node_magnitude"]) - color_min) / (color_max - color_min)
 
     for edge in edge_plot:
         source_node = atlas_nodes[int(edge["_source"])]
@@ -696,14 +707,14 @@ def main() -> None:
     html = args.output.read_text(encoding="utf-8")
     html = html.replace("<body>", "<body style=\"margin:0;overflow:hidden;background:#ffffff;\">", 1)
     args.output.write_text(html, encoding="utf-8")
-    print(f"Saved cached ListSort importance brain: {args.output}")
+    print(f"Saved cached importance brain: {args.output}")
     build_static_4panel_png(
         args.nodes_json,
         args.importance_json,
         args.static_output,
         plot_title=args.plot_title,
     )
-    print(f"Saved cached ListSort static 4-panel brain: {args.static_output}")
+    print(f"Saved cached static 4-panel brain: {args.static_output}")
 
 
 if __name__ == "__main__":

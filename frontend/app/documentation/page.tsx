@@ -1,13 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { BackButton } from '@/components/BackButton'
 import { DocumentationContent } from '@/components/DocumentationContent'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', protected: true },
   { href: '/upload', label: 'Upload Data', protected: true },
-  { href: '/predictions', label: 'Predictions', protected: true },
+  { href: '/predictions2', label: 'Predictions', protected: true },
   { href: '/history', label: 'History', protected: true },
   { href: '/model-performance', label: 'Model Performance', protected: true },
   { href: '/documentation', label: 'Documentation', protected: false },
@@ -24,7 +23,7 @@ export default async function PublicDocumentationPage() {
       <nav className='top-nav'>
         <div className='top-nav-inner'>
           <div className='top-nav-brand'>
-            <Image src='/fyp-logo-brain.png' alt='MindPulse' width={50} height={50} className='rounded-lg' />
+            <Image src='/fyp-logo-brain.png' alt='MindPulse' width={36} height={36} className='rounded-md' />
             <Link href={token ? '/dashboard' : '/'} className='brand-title'>
               MindPulse
             </Link>
@@ -70,7 +69,6 @@ export default async function PublicDocumentationPage() {
       </nav>
 
       <main id='main-content' className='page-shell fade-in-up'>
-        <BackButton fallbackHref={token ? '/dashboard' : '/'} />
         <DocumentationContent />
 
         <div className='disclaimer-bar'>

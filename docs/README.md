@@ -54,7 +54,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 JWT_SECRET=<your_secret>
 DEBUG=True
 MODEL_REGISTRY_DIR=./models
-MODEL_REGISTRY_SCORES=listsort_ageadj,sleep_quality,emotsupp_unadj,picseq,pmat
+MODEL_REGISTRY_SCORES=listsort_ageadj,psqi,emotsupp_unadj,picseq,pmat
 GENERATE_PLOTLY_JSON=false
 GENERATE_NEURO_VISUALS=true
 TORCH_NUM_THREADS=4
@@ -82,13 +82,13 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 - Put `.pt` files in `backend/models/` (or your `MODEL_REGISTRY_DIR` path).
 - File naming convention is score-based:
   - `listsort_ageadj.pt`
-  - `sleep_quality.pt`
+  - `psqi.pt`
   - `emotsupp_unadj.pt`
   - `picseq.pt`
   - `pmat.pt`
 - Startup logs show found/missing model files, and you can query the registry via `GET /api/models`.
 - By default, the backend registry is configured for
-  `listsort_ageadj,sleep_quality,emotsupp_unadj,picseq,pmat`.
+  `listsort_ageadj,psqi,emotsupp_unadj,picseq,pmat`.
 
 ---
 

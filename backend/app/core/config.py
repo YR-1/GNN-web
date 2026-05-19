@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     torch_num_interop_threads: int = 1
     
     # CORS
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000"]
+    allowed_origins: list = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000", "https://gnn-web.vercel.app/"]
 
     @field_validator("debug", mode="before")
     @classmethod

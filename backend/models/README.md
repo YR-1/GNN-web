@@ -7,7 +7,7 @@ Drop trained prediction model files (`.pt`) in this folder.
 Model filenames are resolved by score name:
 
 - `listsort_ageadj` -> `listsort_ageadj.pt`
-- `sleep_quality` -> `sleep_quality.pt`
+- `psqi` -> `psqi.pt`
 - `emotsupp_unadj` -> `emotsupp_unadj.pt`
 - `picseq` -> `picseq.pt`
 - `pmat` -> `pmat.pt`
@@ -29,7 +29,7 @@ Current scaler artifacts:
 Configure in `backend/.env`:
 
 - `MODEL_REGISTRY_DIR=./models`
-- `MODEL_REGISTRY_SCORES=listsort_ageadj,sleep_quality,emotsupp_unadj,picseq,pmat`
+- `MODEL_REGISTRY_SCORES=listsort_ageadj,psqi,emotsupp_unadj,picseq,pmat`
 - `GENERATE_PLOTLY_JSON=false`
 - `GENERATE_NEURO_VISUALS=true`
 - `TORCH_NUM_THREADS=4`

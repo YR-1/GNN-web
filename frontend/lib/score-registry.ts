@@ -97,11 +97,11 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     accentColor: '#ef4444',
   },
   {
-    id: 'sleep_quality',
-    name: 'Sleep Quality',
-    shortName: 'Sleep',
+    id: 'psqi',
+    name: 'PSQI (Sleep Quality)',
+    shortName: 'PSQI',
     category: 'emotion',
-    description: 'Pittsburgh Sleep Quality Index (PSQI) derived from brain connectivity.',
+    description: 'Pittsburgh Sleep Quality Index derived from brain connectivity.',
     relevantROIs: [
       ...range(101, 110), ...range(235, 244),
       ...range(111, 121), ...range(245, 255),

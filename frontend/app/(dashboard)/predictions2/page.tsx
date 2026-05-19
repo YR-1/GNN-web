@@ -27,12 +27,14 @@ const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   pmat: '/static/brain_plots/pmat_importance_3d.html',
   picseq: '/static/brain_plots/picseq_importance_3d.html',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
+  psqi: '/static/brain_plots/psqi_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH,
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
   picseq: '/static/brain_plots/picseq_importance_4panel.png',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
+  psqi: '/static/brain_plots/psqi_importance_4panel.png',
 }
 
 function normalizeScoreId(value: string): string {
@@ -44,6 +46,9 @@ function toCanonicalScoreId(value: string): string {
     emotion_score: 'emotsupp_unadj',
     emotion: 'emotsupp_unadj',
     attention: 'sustained_attention',
+    sleep_quality: 'psqi',
+    sleep: 'psqi',
+    psqi_score: 'psqi',
     wm: 'listsort_ageadj',
     working_memory: 'listsort_ageadj',
     listsort: 'listsort_ageadj',
@@ -132,10 +137,10 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
   pmat: '#a855f7',
   picseq: '#0f766e',
   emotsupp_unadj: '#ef4444',
-  sleep_quality: '#f97316',
+  psqi: '#f97316',
 }
 
-const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'sleep_quality']
+const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
 const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
   sustained_attention: 'picseq',
 }

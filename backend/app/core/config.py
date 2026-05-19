@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    access_token_expire_minutes: int = 600
     
     # API
     api_title: str = "Data Analytics API"

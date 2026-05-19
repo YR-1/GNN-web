@@ -138,9 +138,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     ],
   },
   {
-    id: 'sleep_quality',
-    label: 'Sleep Quality',
-    shortLabel: 'Sleep',
+    id: 'psqi',
+    label: 'PSQI (Sleep Quality)',
+    shortLabel: 'PSQI',
     range: [0, 21],
     average: 13.1,
     trend: -2.7,
@@ -166,7 +166,7 @@ const METRIC_VISUALS: Record<string, Pick<DashboardMetric, 'accent' | 'accentSof
   pmat: { accent: '#a855f7', accentSoft: '#f3e8ff' },
   sustained_attention: { accent: '#ec4899', accentSoft: '#fce7f3' },
   emotion_recognition: { accent: '#ef4444', accentSoft: '#fee2e2' },
-  sleep_quality: { accent: '#f97316', accentSoft: '#ffedd5' },
+  psqi: { accent: '#f97316', accentSoft: '#ffedd5' },
 }
 
 function formatMetricValue(metric: DashboardMetric, value: number): string {

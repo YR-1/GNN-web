@@ -27,12 +27,14 @@ const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   pmat: '/static/brain_plots/pmat_importance_3d.html',
   picseq: '/static/brain_plots/picseq_importance_3d.html',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_3d.html',
+  psqi: '/static/brain_plots/psqi_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
   listsort_ageadj: '/static/brain_plots/listsort_importance_4panel.png',
   pmat: '/static/brain_plots/pmat_importance_4panel.png',
   picseq: '/static/brain_plots/picseq_importance_4panel.png',
   emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
+  psqi: '/static/brain_plots/psqi_importance_4panel.png',
 }
 
 interface PredictionReportProps {
@@ -50,6 +52,9 @@ function toCanonicalScoreId(value: string): string {
     emotion_score: 'emotsupp_unadj',
     emotion: 'emotsupp_unadj',
     attention: 'sustained_attention',
+    sleep_quality: 'psqi',
+    sleep: 'psqi',
+    psqi_score: 'psqi',
     wm: 'listsort_ageadj',
     working_memory: 'listsort_ageadj',
     listsort: 'listsort_ageadj',

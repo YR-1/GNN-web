@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Prediction model registry
     model_registry_dir: str = "./models"
-    model_registry_scores: str = "listsort_ageadj,sleep_quality,emotsupp_unadj,picseq,pmat"
+    model_registry_scores: str = "listsort_ageadj,psqi,emotsupp_unadj,picseq,pmat"
 
     # Expensive visualization artifacts. Keep false for faster upload/prediction.
     generate_plotly_json: bool = False

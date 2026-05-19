@@ -555,7 +555,7 @@ export default function DashboardPage() {
           </div>
 
           <div className='grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] xl:auto-rows-fr'>
-            <div className='rounded-[1.5rem] border border-white/80 bg-white/75 p-3 shadow-[0_16px_34px_rgba(56,189,248,0.09)] backdrop-blur-xl'>
+            <div className='min-w-0 rounded-[1.5rem] border border-white/80 bg-white/75 p-3 shadow-[0_16px_34px_rgba(56,189,248,0.09)] backdrop-blur-xl'>
               <div className='mb-2 flex flex-wrap items-start justify-between gap-2'>
                 <div>
                   <h2 className='text-base font-semibold text-slate-950'>{selectedMetric.label} Distribution</h2>
@@ -569,8 +569,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className='h-[12.5rem]'>
-                <ResponsiveContainer width='100%' height='100%'>
+              <div className='h-[12.5rem] min-w-0'>
+                <ResponsiveContainer width='100%' height='100%' minWidth={0}>
                   <BarChart data={histogramData} margin={{ top: 12, right: 12, left: -12, bottom: 12 }}>
                     <CartesianGrid stroke='rgba(148,163,184,0.18)' vertical={false} />
                     <XAxis

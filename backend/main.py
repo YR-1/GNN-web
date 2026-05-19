@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +35,21 @@ app.add_middleware(
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/brain_plots", StaticFiles(directory=static_dir / "brain_plots"), name="brain_plots")
+
+
+@app.middleware("http")
+async def disable_brain_plot_caching(request: Request, call_next):
+    """Force fresh brain-plot loads so regenerated files are not served from cache."""
+    response = await call_next(request)
+    if (
+        request.url.path.startswith("/static/brain_plots/")
+        or request.url.path.startswith("/brain_plots/")
+    ):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # Include routers
 app.include_router(analytics_router)

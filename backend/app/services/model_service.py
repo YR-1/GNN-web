@@ -369,7 +369,7 @@ def create_nilearn_markers_payload(
 def get_cached_importance_brain_urls() -> Dict[str, str]:
     """Return cached 3D model-importance brain URLs keyed by score id."""
     return {
-        score_id: str(config["brain_url"])
+        score_id: _append_file_version(str(config["brain_url"]), Path(str(config["brain_path"])))
         for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
         if Path(str(config["brain_path"])).exists()
     }
@@ -378,7 +378,7 @@ def get_cached_importance_brain_urls() -> Dict[str, str]:
 def get_cached_importance_static_brain_urls() -> Dict[str, str]:
     """Return cached static model-importance brain URLs keyed by score id."""
     return {
-        score_id: str(config["static_url"])
+        score_id: _append_file_version(str(config["static_url"]), Path(str(config["static_path"])))
         for score_id, config in SCORE_IMPORTANCE_PLOTS.items()
         if Path(str(config["static_path"])).exists()
     }
@@ -392,6 +392,16 @@ def get_cached_listsort_importance_brain_url() -> Optional[str]:
 def get_cached_listsort_importance_static_brain_url() -> Optional[str]:
     """Return the public URL for the cached 4-panel ListSort static brain if generated."""
     return get_cached_importance_static_brain_urls().get("listsort_ageadj")
+
+
+def _append_file_version(url: str, file_path: Path) -> str:
+    """Attach a file mtime cache-buster so regenerated assets get a fresh URL."""
+    try:
+        version = str(file_path.stat().st_mtime_ns)
+    except OSError:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}v={version}"
 
 
 EXPECTED_NROIS = 268

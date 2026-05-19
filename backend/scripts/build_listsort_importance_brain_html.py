@@ -64,6 +64,67 @@ def _load_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def _normalise_importance_payload(
+    importance_payload: dict[str, Any],
+    *,
+    source_path: Path,
+) -> dict[str, Any]:
+    """Adapt alternate explainability exports into the builder's common schema."""
+    raw_nodes = importance_payload.get("nodes", [])
+    if not raw_nodes:
+        return importance_payload
+
+    first_node = raw_nodes[0]
+    if {"id", "score", "score_norm"}.issubset(first_node.keys()):
+        return importance_payload
+
+    if {"roi", "node_strength", "occlusion_importance"}.issubset(first_node.keys()):
+        normalised_nodes = []
+        for node in raw_nodes:
+            roi_id = int(node["roi"])
+            node_score = float(node.get("occlusion_importance", node.get("node_strength", 0.0)))
+            normalised_nodes.append(
+                {
+                    "id": roi_id,
+                    "node_no": roi_id + 1,
+                    "score": node_score,
+                    "score_norm": node_score,
+                    "roi_label": node.get("roi_name"),
+                }
+            )
+
+        normalised_edges = []
+        for edge in importance_payload.get("edges", []):
+            source = int(edge["start_node"])
+            target = int(edge["end_node"])
+            edge_score = float(edge.get("edge_importance", 0.0))
+            raw_edge_type = str(edge.get("edge_type", "")).strip().lower()
+            if raw_edge_type in {"inter-network", "between-category", "between"}:
+                edge_type = "between-category"
+            elif raw_edge_type in {"intra-network", "within-category", "within"}:
+                edge_type = "within-category"
+            else:
+                edge_type = ""
+            normalised_edges.append(
+                {
+                    "source": source,
+                    "target": target,
+                    "weight": edge_score,
+                    "edge_grad": edge_score,
+                    "edge_type": edge_type,
+                }
+            )
+
+        return {
+            **importance_payload,
+            "score_id": importance_payload.get("score_id") or source_path.stem.split("_importance", 1)[0],
+            "nodes": normalised_nodes,
+            "edges": normalised_edges,
+        }
+
+    return importance_payload
+
+
 def _norm(values: Iterable[float], low: float, high: float) -> np.ndarray:
     arr = np.asarray(list(values), dtype=float)
     if arr.size == 0:
@@ -144,7 +205,10 @@ def build_figure(
     plot_title: str = "ListSort FBNetGen importance",
 ) -> go.Figure:
     nodes_payload = _load_json(nodes_json)
-    importance_payload = _load_json(importance_json)
+    importance_payload = _normalise_importance_payload(
+        _load_json(importance_json),
+        source_path=importance_json,
+    )
     is_pmat = _is_pmat_importance(importance_json, importance_payload)
     plotly_layout = PMAT_PLOTLY_LAYOUT if is_pmat else ORIGINAL_PLOTLY_LAYOUT
 
@@ -446,7 +510,10 @@ def build_figure(
 
 def _prepare_static_plot_data(nodes_json: Path, importance_json: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
     nodes_payload = _load_json(nodes_json)
-    importance_payload = _load_json(importance_json)
+    importance_payload = _normalise_importance_payload(
+        _load_json(importance_json),
+        source_path=importance_json,
+    )
     atlas_nodes = {int(node["id"]): node for node in nodes_payload["nodes"]}
 
     importance_nodes = []
@@ -678,7 +745,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    importance_payload = _load_json(args.importance_json)
+    importance_payload = _normalise_importance_payload(
+        _load_json(args.importance_json),
+        source_path=args.importance_json,
+    )
     plotly_layout = PMAT_PLOTLY_LAYOUT if _is_pmat_importance(args.importance_json, importance_payload) else ORIGINAL_PLOTLY_LAYOUT
     fig = build_figure(
         args.nodes_json,

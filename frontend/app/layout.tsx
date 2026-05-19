@@ -35,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang='en'>
+    <html lang='en' data-scroll-behavior='smooth'>
       <body className={`${bodyFont.variable} ${displayFont.variable}`}>
         <a
           href='#main-content'

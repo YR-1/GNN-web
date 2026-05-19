@@ -69,8 +69,30 @@ function toCanonicalScoreId(value: string): string {
 
 function toBackendUrl(pathOrUrl?: string | null): string | null {
   if (!pathOrUrl) return null
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
-  return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
+  const normalizeBrainPlotPath = (value: string): string => {
+    if (value.startsWith('/brain_plots/')) {
+      return `/static${value}`
+    }
+    return value
+  }
+
+  const appendBrainPlotCacheBuster = (value: string): string => {
+    if (!/\/static\/brain_plots\/.+\.(?:html|png)(?:\?.*)?$/i.test(value)) {
+      return value
+    }
+    if (/[?&]v=\d+/i.test(value)) {
+      return value
+    }
+    const separator = value.includes('?') ? '&' : '?'
+    return `${value}${separator}v=${Date.now()}`
+  }
+
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return appendBrainPlotCacheBuster(pathOrUrl)
+  }
+
+  const normalizedPath = appendBrainPlotCacheBuster(normalizeBrainPlotPath(pathOrUrl))
+  return `${API_BASE_URL.replace(/\/$/, '')}/${normalizedPath.replace(/^\//, '')}`
 }
 
 export function PredictionReport({

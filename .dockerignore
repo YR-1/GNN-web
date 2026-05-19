@@ -1,0 +1,71 @@
+# === Frontend (deployed on Vercel, not needed in backend image) ===
+frontend/
+
+# === Backend dev artifacts (already in .gitignore but listed for safety) ===
+__pycache__/
+backend/venv/
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/*.so
+backend/.Python
+backend/env/
+backend/ENV/
+backend/.venv
+backend/.env
+backend/.env.*.local
+backend/.runtime/
+
+# === Other dev/build outputs ===
+.next/
+node_modules/
+dist/
+build/
+*.egg-info/
+.eggs/
+venv/
+
+# === IDE & OS files ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Local databases ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === Testing artifacts ===
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Temp files ===
+tmp/
+temp/
+*.tmp
+
+# === Git & CI ===
+.git/
+.gitignore
+.github/
+
+# === AI assistant memory ===
+.claude/
+
+# === Folders not needed in backend container ===
+docs/
+data/
+
+REFACTORING_SUMMARY.md

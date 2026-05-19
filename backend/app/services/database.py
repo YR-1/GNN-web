@@ -489,9 +489,9 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "range": [0.0, 100.0],
                 "defaultInsight": "Emotion recognition is associated with temporal-limbic and orbitofrontal coordination.",
             },
-            "sleep_quality": {
-                "label": "Sleep Quality",
-                "shortLabel": "Sleep",
+            "psqi": {
+                "label": "PSQI (Sleep Quality)",
+                "shortLabel": "PSQI",
                 "range": [0.0, 21.0],
                 "defaultInsight": "Sleep-quality variation clusters around salience, limbic, and thalamic circuitry.",
             },

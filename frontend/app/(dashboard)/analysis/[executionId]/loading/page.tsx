@@ -105,7 +105,7 @@ export default function AnalysisLoadingPage({
           setLatestAnalysis(analysis)
           setActiveAnalysis(analysis)
           setTimeout(() => {
-            router.replace('/predictions2')
+            router.replace('/predictions')
           }, 360)
         } else if (nextStatus === 'failed') {
           finishedRef.current = true

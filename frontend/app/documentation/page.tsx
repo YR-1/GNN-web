@@ -6,7 +6,7 @@ import { DocumentationContent } from '@/components/DocumentationContent'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', protected: true },
   { href: '/upload', label: 'Upload Data', protected: true },
-  { href: '/predictions2', label: 'Predictions', protected: true },
+  { href: '/predictions', label: 'Predictions', protected: true },
   { href: '/history', label: 'History', protected: true },
   { href: '/model-performance', label: 'Model Performance', protected: true },
   { href: '/documentation', label: 'Documentation', protected: false },

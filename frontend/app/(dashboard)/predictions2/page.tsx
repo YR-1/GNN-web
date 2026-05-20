@@ -351,7 +351,7 @@ export default function Predictions2Page() {
           <Link href='/upload' className='btn-primary'>
             Upload data
           </Link>
-          <Link href='/predictions' className='btn-secondary'>
+          <Link href='/predictions2' className='btn-secondary'>
             Open Predictions
           </Link>
         </div>

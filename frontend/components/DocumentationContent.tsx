@@ -88,7 +88,7 @@ export function DocumentationContent() {
           <div>
             <p className='text-sm text-slate-600 mb-2'>Example data structure:</p>
             <pre className='bg-slate-50 border border-slate-200 rounded-lg p-4 overflow-x-auto text-xs'>
-{`# Time series matrix (m x 268)
+              {`# Time series matrix (m x 268)
 # Each row = one time point
 # Each column = one brain region (Shen atlas)
 
@@ -189,6 +189,11 @@ export function DocumentationContent() {
             <li>
               <strong>Atlas restriction:</strong> Only supports data from the Shen 268-region brain atlas. Other
               parcellations are not compatible.
+            </li>
+            <li>
+              <strong>Age group limitation:</strong> The model is most suitable for healthy young adults aged 22–36,
+              as it was trained using data from participants within this age range. Predictions for users outside
+              this age group may be less reliable.
             </li>
             <li>
               <strong>Data quality dependency:</strong> Prediction accuracy depends on the quality of input fMRI data,

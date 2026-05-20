@@ -60,7 +60,7 @@ class SupabaseService:
             
             # Get public URL
             public_url = self.client.storage.from_("roi-analysis").get_public_url(path)
-            return public_url["publicURL"] if public_url else None
+            return public_url if public_url else None
             
         except Exception as e:
             print(f"Error saving graph to Supabase: {str(e)}")
@@ -112,7 +112,7 @@ class SupabaseService:
             
             # Get public URL
             public_url = self.client.storage.from_("roi-analysis").get_public_url(path)
-            return public_url["publicURL"] if public_url else None
+            return public_url if public_url else None
             
         except Exception as e:
             print(f"Error saving correlation matrix to Supabase: {str(e)}")

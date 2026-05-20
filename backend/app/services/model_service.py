@@ -565,8 +565,15 @@ def _load_timeseries_file(file_path: str, expected_nrois: int = EXPECTED_NROIS) 
 
 def _import_graph_preprocessing_modules():
     """Import step1/step2 preprocessing modules from notebooks folder."""
-    project_root = Path(__file__).resolve().parents[3]
-    notebooks_dir = project_root / "notebooks"
+    service_path = Path(__file__).resolve()
+    notebook_candidates = [parent / "notebooks" for parent in service_path.parents]
+    notebook_candidates.append(Path.cwd() / "notebooks")
+
+    notebooks_dir = next((candidate for candidate in notebook_candidates if candidate.exists()), None)
+    if notebooks_dir is None:
+        checked = ", ".join(str(candidate) for candidate in notebook_candidates)
+        raise FileNotFoundError(f"Could not find notebooks directory. Checked: {checked}")
+
     if str(notebooks_dir) not in sys.path:
         sys.path.insert(0, str(notebooks_dir))
 
@@ -1334,9 +1341,15 @@ def _build_results_payload(
         predicted_scores, explained_scores, prediction_errors, model_registry = _run_model_predictions(
             graph_payload["graphs_flat"]
         )
+        print(
+            "[model] Prediction summary: "
+            f"predicted={len(predicted_scores)}, errors={len(prediction_errors)}, "
+            f"graph_windows={graph_windows_count}"
+        )
     except Exception as exc:
         model_registry = build_model_registry(get_settings())
         prediction_errors = [f"graph-preprocessing: {exc}"]
+        print(f"[model] Graph preprocessing failed: {exc}")
 
     results = {
         "n_rois": int(n_rois),

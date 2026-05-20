@@ -204,6 +204,7 @@ export default function Predictions2Page() {
   }, [activeAnalysis, latestAnalysis, router, setActiveAnalysis, setLatestAnalysis])
 
   const results = activeAnalysis?.results as CorrelationResults | undefined
+  const predictionErrors = results?.prediction_errors?.filter(Boolean) ?? []
 
   const modelPredictions = useMemo(() => {
     const byId: Record<string, SimulatedScoreResult> = {}
@@ -431,6 +432,13 @@ export default function Predictions2Page() {
                     </div>
                   ) : null}
                 </div>
+
+                {predictionErrors.length > 0 ? (
+                  <div className='mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900'>
+                    <p className='font-medium'>Some model predictions are unavailable.</p>
+                    <p className='mt-1 break-words text-amber-800'>{predictionErrors.join(' | ')}</p>
+                  </div>
+                ) : null}
 
                 <div className='flex-1 space-y-2.5'>
                   {[

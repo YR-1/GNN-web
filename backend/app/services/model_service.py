@@ -1239,6 +1239,7 @@ def _run_model_predictions(
                     graphs_flat,
                     target_scaler_json_path=target_scaler_json,
                 )
+                explanation = _explain_single_score_model(model, graphs_flat)
             predicted_scores.append(
                 {
                     "score_id": score_id,
@@ -1252,6 +1253,14 @@ def _run_model_predictions(
                     "normalized_value": prediction["normalized_value"],
                     "target_scaler": prediction["target_scaler"],
                     "source": "model",
+                }
+            )
+            explained_scores.append(
+                {
+                    "score_id": score_id,
+                    "model_file": model_meta.get("filename"),
+                    "source": "model",
+                    **explanation,
                 }
             )
             print(

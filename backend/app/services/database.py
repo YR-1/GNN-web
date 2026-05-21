@@ -4,6 +4,7 @@ import math
 import threading
 import traceback
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from supabase import Client, create_client
@@ -21,6 +22,8 @@ class SupabaseDbService:
             raise RuntimeError("Supabase credentials are not configured for backend DB access.")
         self.client: Client = create_client(settings.supabase_url, key)
         self._client_lock = threading.RLock()
+        self._roi_network_map = self._load_roi_network_map()
+        self._score_region_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     async def _run(self, fn):
         def locked_call():
@@ -63,6 +66,186 @@ class SupabaseDbService:
                 return {}
         return {}
 
+    @staticmethod
+    def _normalize_network_name(value: str) -> str:
+        compact = "".join(ch.lower() for ch in value if ch.isalnum())
+        aliases = {
+            "frontoparietal": "Frontoparietal",
+            "defaultmode": "Default Mode",
+            "medialfrontal": "Medial Frontal",
+            "motor": "Motor",
+            "visuali": "Visual I",
+            "visualii": "Visual II",
+            "visualassoc": "Visual Association",
+            "visualassociation": "Visual Association",
+            "subcorticalcerebellum": "Subcortical/Cerebellum",
+        }
+        return aliases.get(compact, value)
+
+    @staticmethod
+    def _is_dashboard_network_name(value: str) -> bool:
+        return value in {
+            "Frontoparietal",
+            "Default Mode",
+            "Medial Frontal",
+            "Motor",
+            "Visual I",
+            "Visual II",
+            "Visual Association",
+            "Subcortical/Cerebellum",
+        }
+
+    def _load_roi_network_map(self) -> Dict[int, str]:
+        nodes_path = Path(__file__).resolve().parents[1] / "data" / "brain_importance" / "shen268_nodes.json"
+        try:
+            payload = json.loads(nodes_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+        nodes = payload.get("nodes") if isinstance(payload, dict) else None
+        if not isinstance(nodes, list):
+            return {}
+
+        mapping: Dict[int, str] = {}
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            node_no = node.get("node_no")
+            network = node.get("network")
+            if isinstance(node_no, int) and isinstance(network, str) and network.strip():
+                mapping[node_no] = self._normalize_network_name(network.strip())
+        return mapping
+
+    def _get_dashboard_network_label(self, roi_index: Any = None, raw_label: Any = None) -> str:
+        if isinstance(roi_index, int):
+            mapped = self._roi_network_map.get(roi_index)
+            if mapped and self._is_dashboard_network_name(mapped):
+                return mapped
+
+        label = self._normalize_network_name(str(raw_label or "").strip())
+        return label if self._is_dashboard_network_name(label) else ""
+
+    def _build_dashboard_top_regions(self, explanation: Dict[str, Any]) -> List[Dict[str, Any]]:
+        top_edges = explanation.get("top_edges") or []
+        if not isinstance(top_edges, list):
+            top_edges = []
+
+        region_scores: Dict[str, float] = {}
+        for edge in top_edges[:10]:
+            if not isinstance(edge, dict):
+                continue
+            importance = self._safe_float(edge.get("importance"))
+            if importance is None:
+                continue
+
+            source_label = self._get_dashboard_network_label(
+                roi_index=edge.get("source_roi"),
+                raw_label=edge.get("source_label"),
+            )
+            target_label = self._get_dashboard_network_label(
+                roi_index=edge.get("target_roi"),
+                raw_label=edge.get("target_label"),
+            )
+
+            if source_label:
+                region_scores[source_label] = region_scores.get(source_label, 0.0) + importance
+            if target_label:
+                region_scores[target_label] = region_scores.get(target_label, 0.0) + importance
+
+        if region_scores:
+            return [
+                {"name": name, "importance": score}
+                for name, score in sorted(region_scores.items(), key=lambda item: item[1], reverse=True)[:8]
+            ]
+
+        roi_items = explanation.get("roi_importance") or []
+        if not isinstance(roi_items, list):
+            roi_items = []
+
+        fallback_scores: Dict[str, float] = {}
+        for roi in roi_items[:10]:
+            if not isinstance(roi, dict):
+                continue
+            importance = self._safe_float(roi.get("importance"))
+            if importance is None:
+                continue
+            label = self._get_dashboard_network_label(
+                roi_index=roi.get("roi_index"),
+                raw_label=roi.get("label"),
+            )
+            if label:
+                fallback_scores[label] = fallback_scores.get(label, 0.0) + importance
+
+        return [
+            {"name": name, "importance": score}
+            for name, score in sorted(fallback_scores.items(), key=lambda item: item[1], reverse=True)[:8]
+        ]
+
+    def _get_score_fallback_top_regions(self, score_id: str) -> List[Dict[str, Any]]:
+        normalized_score_id = str(score_id or "").strip().lower()
+        if not normalized_score_id:
+            return []
+
+        cached = self._score_region_cache.get(normalized_score_id)
+        if cached is not None:
+            return [dict(item) for item in cached]
+
+        score_files = {
+            "listsort_ageadj": "listsort_fbnetgen_importance_top100.json",
+            "pmat": "pmat_braingnn_importance_top100.json",
+            "picseq": "picseq_fbnetgen_importance_top100.json",
+            "emotion_recognition": "emotsupp_reggnn_importance_top100.json",
+            "emotsupp_unadj": "emotsupp_reggnn_importance_top100.json",
+            "psqi": "psqi_reggnn_importance_top100.json",
+        }
+        file_name = score_files.get(normalized_score_id)
+        if not file_name:
+            self._score_region_cache[normalized_score_id] = []
+            return []
+
+        payload_path = Path(__file__).resolve().parents[1] / "data" / "brain_importance" / file_name
+        try:
+            payload = json.loads(payload_path.read_text(encoding="utf-8"))
+        except Exception:
+            self._score_region_cache[normalized_score_id] = []
+            return []
+
+        edges = payload.get("edges") if isinstance(payload, dict) else None
+        plot_edges = payload.get("plot_edges") if isinstance(payload, dict) else None
+        edge_candidates = plot_edges if isinstance(plot_edges, list) and plot_edges else edges
+        if not isinstance(edge_candidates, list):
+            self._score_region_cache[normalized_score_id] = []
+            return []
+
+        top_k_edges = 15 if normalized_score_id == "pmat" else 30
+        region_scores: Dict[str, float] = {}
+        for edge in edge_candidates[:top_k_edges]:
+            if not isinstance(edge, dict):
+                continue
+            importance = self._safe_float(edge.get("weight"))
+            if importance is None:
+                continue
+            source_label = self._get_dashboard_network_label(
+                roi_index=edge.get("source_node_no"),
+                raw_label=edge.get("start_network"),
+            )
+            target_label = self._get_dashboard_network_label(
+                roi_index=edge.get("target_node_no"),
+                raw_label=edge.get("end_network"),
+            )
+
+            if source_label:
+                region_scores[source_label] = region_scores.get(source_label, 0.0) + abs(importance)
+            if target_label:
+                region_scores[target_label] = region_scores.get(target_label, 0.0) + abs(importance)
+
+        fallback = [
+            {"name": name, "importance": score}
+            for name, score in sorted(region_scores.items(), key=lambda item: item[1], reverse=True)[:8]
+        ]
+        self._score_region_cache[normalized_score_id] = fallback
+        return [dict(item) for item in fallback]
+
     def _build_prediction_summary_rows(
         self,
         *,
@@ -97,22 +280,9 @@ class SupabaseDbService:
                 continue
 
             explanation = explained_by_score.get(score_id, {})
-            roi_items = explanation.get("roi_importance") or []
-            if not isinstance(roi_items, list):
-                roi_items = []
-
-            top_regions = []
-            for roi in roi_items[:10]:
-                if not isinstance(roi, dict):
-                    continue
-                label = str(roi.get("label") or roi.get("roi_index") or "").strip()
-                importance = self._safe_float(roi.get("importance"))
-                if not label or importance is None:
-                    continue
-                top_regions.append({
-                    "name": label,
-                    "importance": importance,
-                })
+            top_regions = self._build_dashboard_top_regions(explanation)
+            if not top_regions:
+                top_regions = self._get_score_fallback_top_regions(score_id)
 
             summary_rows.append(
                 {
@@ -477,11 +647,11 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "range": [0.0, 24.0],
                 "defaultInsight": "Fluid reasoning aligns with executive-control and parietal integration patterns.",
             },
-            "sustained_attention": {
-                "label": "Sustained Attention",
-                "shortLabel": "Attention",
-                "range": [0.0, 1.0],
-                "defaultInsight": "Attention performance tracks dorsal attention synchronization stability.",
+            "picseq": {
+                "label": "PicSeq (Picture Sequence Memory)",
+                "shortLabel": "PicSeq",
+                "range": [50.0, 150.0],
+                "defaultInsight": "Picture-sequence memory patterns reflect distributed episodic-memory and associative network coordination.",
             },
             "emotion_recognition": {
                 "label": "Emotion Recognition",
@@ -496,6 +666,10 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "defaultInsight": "Sleep-quality variation clusters around salience, limbic, and thalamic circuitry.",
             },
         }
+        metric_aliases = {
+            "sustained_attention": "picseq",
+            "emotsupp_unadj": "emotion_recognition",
+        }
 
         uploads_resp = (
             service.client.table("file_uploads")
@@ -508,7 +682,7 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
 
         exec_resp = (
             service.client.table("model_executions")
-            .select("execution_id,status,created_at,completed_at")
+            .select("execution_id,upload_id,status,created_at,completed_at,results")
             .eq("user_id", user_id)
             .execute()
         )
@@ -516,6 +690,16 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
 
         completed = [e for e in executions if e.get("status") == "completed"]
         pending = [e for e in executions if e.get("status") in ("queued", "processing")]
+        completed_by_execution_id = {
+            str(e.get("execution_id")): e
+            for e in completed
+            if e.get("execution_id")
+        }
+        completed_execution_ids = [
+            str(e.get("execution_id"))
+            for e in completed
+            if e.get("execution_id")
+        ]
 
         durations = []
         for e in completed:
@@ -536,14 +720,54 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
 
         dashboard_metrics = []
         try:
-            summary_resp = (
-                service.client.table("prediction_summaries")
-                .select("score_id,predicted_value,completed_at,top_regions")
-                .eq("user_id", user_id)
-                .order("completed_at", desc=False)
-                .execute()
-            )
-            summary_rows = summary_resp.data or []
+            summary_rows = []
+            if completed_execution_ids:
+                summary_resp = (
+                    service.client.table("prediction_summaries")
+                    .select("execution_id,score_id,predicted_value,completed_at,top_regions")
+                    .eq("user_id", user_id)
+                    .in_("execution_id", completed_execution_ids)
+                    .order("completed_at", desc=False)
+                    .execute()
+                )
+                summary_rows = summary_resp.data or []
+
+            if not summary_rows and completed:
+                for execution in completed:
+                    execution_id = str(execution.get("execution_id") or "")
+                    upload_id = str(execution.get("upload_id") or "")
+                    completed_at = str(execution.get("completed_at") or datetime.utcnow().isoformat())
+                    results = service._normalize_json_dict(execution.get("results"))
+                    if not execution_id or not upload_id:
+                        continue
+                    summary_rows.extend(
+                        service._build_prediction_summary_rows(
+                            execution_id=execution_id,
+                            upload_id=upload_id,
+                            user_id=user_id,
+                            results=results,
+                            completed_at_iso=completed_at,
+                        )
+                    )
+
+            execution_region_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+            for execution_id, execution in completed_by_execution_id.items():
+                results = service._normalize_json_dict(execution.get("results"))
+                explained_scores = results.get("explained_scores") or []
+                if not isinstance(explained_scores, list):
+                    continue
+
+                per_score_regions: Dict[str, List[Dict[str, Any]]] = {}
+                for explanation in explained_scores:
+                    if not isinstance(explanation, dict):
+                        continue
+                    score_id = str(explanation.get("score_id") or "").strip().lower()
+                    if not score_id:
+                        continue
+                    per_score_regions[score_id] = service._build_dashboard_top_regions(explanation)
+
+                if per_score_regions:
+                    execution_region_cache[execution_id] = per_score_regions
 
             metric_values: Dict[str, List[float]] = {metric_id: [] for metric_id in metric_configs}
             metric_timeline: Dict[str, List[tuple[str, float]]] = {metric_id: [] for metric_id in metric_configs}
@@ -552,24 +776,38 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
             for row in summary_rows:
                 if not isinstance(row, dict):
                     continue
-                metric_id = str(row.get("score_id") or "").strip().lower()
+                raw_metric_id = str(row.get("score_id") or "").strip().lower()
+                metric_id = metric_aliases.get(raw_metric_id, raw_metric_id)
                 if metric_id not in metric_configs:
                     continue
-                value = self._safe_float(row.get("predicted_value"))
+                value = service._safe_float(row.get("predicted_value"))
                 if value is None:
                     continue
                 timeline_key = str(row.get("completed_at") or "")
                 metric_values[metric_id].append(value)
                 metric_timeline[metric_id].append((timeline_key, value))
 
-                top_regions = row.get("top_regions") or []
-                if not isinstance(top_regions, list):
-                    top_regions = []
-                for region in top_regions[:10]:
-                    if not isinstance(region, dict):
-                        continue
+                execution_id = str(row.get("execution_id") or "")
+                resolved_regions = execution_region_cache.get(execution_id, {}).get(raw_metric_id, [])
+                if not resolved_regions:
+                    top_regions = row.get("top_regions") or []
+                    if not isinstance(top_regions, list):
+                        top_regions = []
+                    for region in top_regions[:10]:
+                        if not isinstance(region, dict):
+                            continue
+                        label = service._get_dashboard_network_label(raw_label=region.get("name"))
+                        importance = service._safe_float(region.get("importance"))
+                        if not label or importance is None:
+                            continue
+                        resolved_regions.append({"name": label, "importance": importance})
+                if not resolved_regions:
+                    fallback_metric_id = raw_metric_id if raw_metric_id in {"listsort_ageadj", "pmat", "picseq", "emotsupp_unadj", "psqi"} else metric_id
+                    resolved_regions = service._get_score_fallback_top_regions(fallback_metric_id)
+
+                for region in resolved_regions:
                     label = str(region.get("name") or "").strip()
-                    importance = self._safe_float(region.get("importance"))
+                    importance = service._safe_float(region.get("importance"))
                     if not label or importance is None:
                         continue
                     metric_region_scores[metric_id][label] = metric_region_scores[metric_id].get(label, 0.0) + importance

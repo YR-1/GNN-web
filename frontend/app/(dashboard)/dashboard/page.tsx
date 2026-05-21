@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bar,
   BarChart,
@@ -94,25 +94,25 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     ],
   },
   {
-    id: 'sustained_attention',
-    label: 'Sustained Attention',
-    shortLabel: 'Attention',
-    range: [0, 1],
-    average: 0.53,
+    id: 'picseq',
+    label: 'PicSeq (Picture Sequence Memory)',
+    shortLabel: 'PicSeq',
+    range: [50, 150],
+    average: 102,
     trend: 1.9,
     accent: '#EC4899',
     accentSoft: '#FCE7F3',
-    distribution: [0.08, 0.13, 0.19, 0.24, 0.29, 0.35, 0.41, 0.47, 0.53, 0.58, 0.64, 0.71, 0.77, 0.84, 0.91],
-    cohortSplit: [0.47, 0.59],
+    distribution: [66, 72, 77, 83, 88, 92, 96, 102, 107, 111, 116, 121, 126, 132, 138],
+    cohortSplit: [96, 108],
     confidence: 0.9,
     reliability: 'Stable across sessions',
-    insight: 'Attention performance tracks dorsal attention synchronization with stronger stability in mid-range sustained-control profiles.',
+    insight: 'Picture-sequence memory patterns reflect distributed episodic-memory and associative network coordination.',
     topRegions: [
-      { name: 'Superior Parietal Cortex', contribution: 95 },
-      { name: 'Frontal Eye Fields', contribution: 86 },
+      { name: 'Hippocampus', contribution: 95 },
+      { name: 'Parahippocampal Cortex', contribution: 86 },
       { name: 'Precuneus', contribution: 80 },
-      { name: 'Middle Frontal Gyrus', contribution: 76 },
-      { name: 'Visual Association Cortex', contribution: 69 },
+      { name: 'Posterior Cingulate', contribution: 76 },
+      { name: 'Temporal Association Cortex', contribution: 69 },
     ],
   },
   {
@@ -164,7 +164,7 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
 const METRIC_VISUALS: Record<string, Pick<DashboardMetric, 'accent' | 'accentSoft'>> = {
   listsort_ageadj: { accent: '#3B82F6', accentSoft: '#DBEAFE' },
   pmat: { accent: '#8B5CF6', accentSoft: '#EDE9FE' },
-  sustained_attention: { accent: '#EC4899', accentSoft: '#FCE7F3' },
+  picseq: { accent: '#EC4899', accentSoft: '#FCE7F3' },
   emotion_recognition: { accent: '#EF4444', accentSoft: '#FEE2E2' },
   psqi: { accent: '#F97316', accentSoft: '#FFEDD5' },
 }
@@ -271,32 +271,37 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
       </div>
 
       <div className='mt-4 space-y-2'>
-        {topRegions.map((region, index) => (
-          <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm'>
-            <div className='mb-1.5 flex items-center justify-between gap-3'>
-              <div className='flex items-center gap-3'>
-                <span
-                  className='inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm'
-                  style={{ background: metric.accent }}
-                >
-                  {index + 1}
-                </span>
-                <span className='text-[12px] font-medium text-slate-900'>{region.name}</span>
+        {topRegions.length > 0 ? (
+          topRegions.map((region, index) => (
+            <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm'>
+              <div className='mb-1.5 flex items-center justify-between gap-3'>
+                <div className='flex items-center gap-3'>
+                  <span
+                    className='inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm'
+                    style={{ background: metric.accent }}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className='text-[12px] font-medium text-slate-900'>{region.name}</span>
+                </div>
               </div>
-              <span className='text-[12px] font-semibold text-slate-950'>{region.contribution}%</span>
+              <div className='h-2 rounded-full bg-slate-100'>
+                <div
+                  className='h-full rounded-full transition-all duration-500'
+                  style={{
+                    width: `${region.contribution}%`,
+                    background: `linear-gradient(90deg, ${metric.accent}, ${metric.accent}bb)`,
+                    boxShadow: `0 0 18px ${metric.accent}55`,
+                  }}
+                />
+              </div>
             </div>
-            <div className='h-2 rounded-full bg-slate-100'>
-              <div
-                className='h-full rounded-full transition-all duration-500'
-                style={{
-                  width: `${region.contribution}%`,
-                  background: `linear-gradient(90deg, ${metric.accent}, ${metric.accent}bb)`,
-                  boxShadow: `0 0 18px ${metric.accent}55`,
-                }}
-              />
-            </div>
+          ))
+        ) : (
+          <div className='rounded-[0.95rem] border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-[12px] text-slate-500'>
+            No participant-level brain-region explanation is available for this metric yet.
           </div>
-        ))}
+        )}
       </div>
     </div>
   )
@@ -368,6 +373,8 @@ function BoxplotStrip({ metric }: { metric: DashboardMetric }) {
 
 export default function DashboardPage() {
   const [selectedMetricId, setSelectedMetricId] = useState<string>(DASHBOARD_METRICS[0].id)
+  const [hasRequestedBackfill, setHasRequestedBackfill] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: stats, isLoading, error } = useQuery<DashboardStats>({
     queryKey: ['dashboardStats'],
@@ -376,7 +383,7 @@ export default function DashboardPage() {
 
   const dashboardMetrics = useMemo<DashboardMetric[]>(() => {
     const actualMetrics = stats?.dashboard_metrics ?? []
-    if (actualMetrics.length === 0) return DASHBOARD_METRICS
+    if (actualMetrics.length === 0) return []
 
     return actualMetrics.map((metric) => {
       const visual = METRIC_VISUALS[metric.id]
@@ -385,6 +392,8 @@ export default function DashboardPage() {
         ...metric,
         accent: visual?.accent ?? fallback?.accent ?? '#3B82F6',
         accentSoft: visual?.accentSoft ?? fallback?.accentSoft ?? '#DBEAFE',
+        insight: metric.insight || fallback?.insight || '',
+        topRegions: metric.topRegions ?? [],
       }
     })
   }, [stats?.dashboard_metrics])
@@ -400,10 +409,26 @@ export default function DashboardPage() {
     }
   }, [dashboardMetrics, selectedMetricId])
 
-  const histogramData = useMemo(() => buildHistogram(selectedMetric), [selectedMetric])
-  const histogramTicks = useMemo(() => buildHistogramTicks(selectedMetric), [selectedMetric])
+  useEffect(() => {
+    if (hasRequestedBackfill || !stats) return
+    const hasCompletedHistory = (stats.completed_analyses ?? 0) > 0
+    const hasDashboardMetrics = (stats.dashboard_metrics?.length ?? 0) > 0
+    const hasMissingTopRegions = (stats.dashboard_metrics ?? []).some(
+      (metric) => !metric.topRegions || metric.topRegions.length === 0
+    )
+    if (!hasCompletedHistory) return
+    if (hasDashboardMetrics && !hasMissingTopRegions) return
+
+    setHasRequestedBackfill(true)
+    void analysisService.backfillDashboardSummaries()
+      .then(() => queryClient.invalidateQueries({ queryKey: ['dashboardStats'] }))
+      .catch(() => undefined)
+  }, [hasRequestedBackfill, queryClient, stats])
+
+  const histogramData = useMemo(() => (selectedMetric ? buildHistogram(selectedMetric) : []), [selectedMetric])
+  const histogramTicks = useMemo(() => (selectedMetric ? buildHistogramTicks(selectedMetric) : []), [selectedMetric])
   const histogramColors = useMemo(
-    () => histogramBarColors(selectedMetric, histogramData.length),
+    () => (selectedMetric ? histogramBarColors(selectedMetric, histogramData.length) : []),
     [histogramData.length, selectedMetric]
   )
 
@@ -417,9 +442,8 @@ export default function DashboardPage() {
 
   const cohortSize = Math.max(
     safeStats.completed,
-    selectedMetric.distribution.length,
-    safeStats.recentUploads.length,
-    18
+    safeStats.totalUploads,
+    safeStats.recentUploads.length
   )
 
   const successRate =

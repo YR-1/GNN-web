@@ -465,19 +465,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className='grid shrink-0 gap-2 sm:grid-cols-2 xl:min-w-[17rem]'>
+            <div className='grid shrink-0 gap-2 xl:min-w-[8.5rem]'>
               <div className='rounded-[1rem] border border-white/80 bg-white/75 p-2 shadow-sm'>
                 <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Cohort Size</p>
                 <div className='mt-1 flex items-end justify-between gap-3'>
                   <p className='text-[1.2rem] font-semibold text-slate-950'>{cohortSize}</p>
                   <Users className='h-4 w-4 text-violet-500' />
-                </div>
-              </div>
-              <div className='rounded-[1rem] border border-white/80 bg-white/75 p-2 shadow-sm'>
-                <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>AI Reliability</p>
-                <div className='mt-1 flex items-end justify-between gap-3'>
-                  <p className='text-[1.2rem] font-semibold text-slate-950'>{Math.round(selectedMetric.confidence * 100)}%</p>
-                  <ShieldCheck className='h-4 w-4 text-sky-500' />
                 </div>
               </div>
             </div>

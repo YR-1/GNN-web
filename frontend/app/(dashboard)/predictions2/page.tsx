@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
@@ -81,7 +82,43 @@ function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueSc
 
 function formatRangeLabel(scoreDef: ScoreDefinition): string {
   const [min, max] = scoreDef.scoreRange
-  return `Range: ${formatValue(min, scoreDef)} - ${formatValue(max, scoreDef)}`
+  const formatRangeValue = (value: number) => (Number.isInteger(value) ? value.toString() : formatValue(value, scoreDef))
+  return `Range: ${formatRangeValue(min)} - ${formatRangeValue(max)}`
+}
+
+function ScoreInfoTooltip({ score, x, y }: { score: ScoreDefinition; x: number; y: number }) {
+  return (
+    <div
+      className='pointer-events-none fixed z-[9999] w-80 max-w-[calc(100vw-3rem)] rounded-[0.9rem] border border-slate-200 bg-white p-3 text-left shadow-xl ring-1 ring-slate-900/5'
+      style={{ left: x, top: y }}
+    >
+      <p className='text-[12px] font-semibold leading-snug text-slate-950'>{score.name}</p>
+      <div className='mt-2 grid gap-1.5 text-[11px] text-slate-700'>
+        {score.domain || score.construct ? (
+          <div>
+            <span className='font-semibold text-slate-950'>Area: </span>
+            {[score.domain, score.construct].filter(Boolean).join(' - ')}
+          </div>
+        ) : null}
+        <div>
+          <span className='font-semibold text-slate-950'>Measures: </span>
+          {score.detail ?? score.description}
+        </div>
+        {score.measureName ? (
+          <div>
+            <span className='font-semibold text-slate-950'>Full measure: </span>
+            {score.measureName}
+          </div>
+        ) : null}
+      </div>
+      {score.interpretation ? (
+        <div className='mt-2 rounded-[0.65rem] bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-700'>
+          <span className='font-semibold text-slate-950'>How to read it: </span>
+          {score.interpretation}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function scorePercent(value: number, scoreDef: ScoreDefinition): number {
@@ -133,11 +170,11 @@ function buildFocusedTimeSeries(
 }
 
 const METRIC_BAR_ACCENTS: Record<string, string> = {
-  listsort_ageadj: '#3B82F6',
-  pmat: '#8B5CF6',
-  picseq: '#EC4899',
-  emotsupp_unadj: '#EF4444',
-  psqi: '#F97316',
+  listsort_ageadj: '#7c3aed',
+  pmat: '#a855f7',
+  picseq: '#0f766e',
+  emotsupp_unadj: '#ef4444',
+  psqi: '#f97316',
 }
 
 const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
@@ -158,6 +195,23 @@ export default function Predictions2Page() {
   const [error, setError] = useState('')
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
   const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
+  const [hoveredScoreInfo, setHoveredScoreInfo] = useState<{ score: ScoreDefinition; x: number; y: number } | null>(null)
+
+  const showScoreInfo = (score: ScoreDefinition, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const tooltipWidth = 320
+    const viewportPadding = 12
+    const x = Math.min(
+      Math.max(rect.left, viewportPadding),
+      window.innerWidth - tooltipWidth - viewportPadding
+    )
+
+    setHoveredScoreInfo({
+      score,
+      x,
+      y: rect.bottom + 8,
+    })
+  }
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -204,7 +258,6 @@ export default function Predictions2Page() {
   }, [activeAnalysis, latestAnalysis, router, setActiveAnalysis, setLatestAnalysis])
 
   const results = activeAnalysis?.results as CorrelationResults | undefined
-  const predictionErrors = results?.prediction_errors?.filter(Boolean) ?? []
 
   const modelPredictions = useMemo(() => {
     const byId: Record<string, SimulatedScoreResult> = {}
@@ -352,7 +405,7 @@ export default function Predictions2Page() {
           <Link href='/upload' className='btn-primary'>
             Upload data
           </Link>
-          <Link href='/predictions2' className='btn-secondary'>
+          <Link href='/predictions' className='btn-secondary'>
             Open Predictions
           </Link>
         </div>
@@ -361,20 +414,22 @@ export default function Predictions2Page() {
   }
 
   return (
-    <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
-      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-2.5 sm:px-4.5'>
-        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>Predicted Brain Behavior Dashboard</h1>
-        <p className='mt-0.5 text-[12px] text-slate-600'>
-          File: <span className='mono-data'>{results.file_name}</span>
-        </p>
-      </header>
+    <div className='space-y-4'>
+      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
+        <div className='grid h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-3'>
+          <section className='px-1 py-0'>
+            <div className='space-y-0.5'>
+              <h1 className='font-display text-lg font-semibold text-slate-950'>Predicted Brain Behavior Dashboard</h1>
+              <p className='text-sm text-slate-700'>
+                File: <span className='mono-data'>{results.file_name}</span>
+              </p>
+            </div>
+          </section>
 
-      <div className='space-y-2 bg-white px-3 pb-3 pt-1.5 sm:px-3.5 sm:pb-3.5 sm:pt-1.5'>
-      <section className='grid h-[calc(100vh-5.35rem)] grid-rows-[minmax(0,1fr)] gap-1 overflow-hidden'>
-          <section className='min-h-0 overflow-hidden'>
-            <div className='grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
+          <section className='min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm'>
+            <div className='grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
               <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
-                <div className='min-h-0 overflow-hidden'>
+                <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
                   {selectedImportanceBrainUrl ? (
                     <div className='relative h-full min-h-[15rem]'>
                       {isImportanceBrainLoading && (
@@ -409,7 +464,7 @@ export default function Predictions2Page() {
                   )}
                 </div>
 
-                <section className='overflow-hidden'>
+                <section className='overflow-hidden rounded-[1.2rem] bg-white'>
                   <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
                     <StaticBrainViews
                       markersPngBase64={results.nilearn_markers_png_base64}
@@ -420,23 +475,16 @@ export default function Predictions2Page() {
                   </div>
                 </section>
               </div>
-            <div className='flex min-h-0 flex-col p-2.5'>
+            <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-2.5'>
                 <div className='mb-2 flex items-start justify-between gap-3'>
                   <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
                   {selectedScoreResult && selectedScore ? (
-                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-right shadow-sm'>
+                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-white px-2.5 py-1.5 text-right shadow-sm'>
                       <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
                       <p className='text-sm font-semibold text-slate-950'>{selectedScore.shortName}</p>
                     </div>
                   ) : null}
                 </div>
-
-                {predictionErrors.length > 0 ? (
-                  <div className='mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900'>
-                    <p className='font-medium'>Some model predictions are unavailable.</p>
-                    <p className='mt-1 break-words text-amber-800'>{predictionErrors.join(' | ')}</p>
-                  </div>
-                ) : null}
 
                 <div className='flex-1 space-y-2.5'>
                   {[
@@ -464,10 +512,19 @@ export default function Predictions2Page() {
                           const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
 
                           return (
-                            <button
+                            <div
                               key={score.id}
-                              type='button'
-                              onClick={() => setSelectedScoreId(score.id)}
+                              role='button'
+                              tabIndex={0}
+                              onClick={() => {
+                                setSelectedScoreId(score.id)
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setSelectedScoreId(score.id)
+                                }
+                              }}
                               className={`w-full rounded-[0.95rem] border px-3 py-2 text-left transition ${
                                 selectedScore?.id === score.id
                                   ? 'border-slate-300 bg-slate-100 shadow-sm'
@@ -479,15 +536,22 @@ export default function Predictions2Page() {
                                   <div className='flex items-center gap-1.5'>
                                     <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
                                     <span
-                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
-                                      title={score.description}
+                                      className='inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500 transition hover:border-slate-500 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300'
+                                      role='img'
+                                      tabIndex={0}
                                       aria-label={`${score.name} info`}
+                                      onMouseEnter={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onMouseLeave={() => setHoveredScoreInfo(null)}
+                                      onFocus={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onBlur={() => setHoveredScoreInfo(null)}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                      }}
                                     >
                                       <Info className='h-2.5 w-2.5' />
                                     </span>
                                   </div>
                                   <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
-                                    <p className='text-slate-500'>{score.unit}</p>
                                     <p className='text-slate-400'>{formatRangeLabel(score)}</p>
                                   </div>
                                 </div>
@@ -506,7 +570,7 @@ export default function Predictions2Page() {
                                   }}
                                 />
                               </div>
-                            </button>
+                            </div>
                           )
                         })}
                       </div>
@@ -516,9 +580,10 @@ export default function Predictions2Page() {
             </div>
             </div>
           </section>
+        </div>
       </section>
 
-      <section className='overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-slate-50/75'>
+      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
         <div className='p-3'>
           <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
             <div className='flex h-full flex-col space-y-4'>
@@ -555,7 +620,12 @@ export default function Predictions2Page() {
           </section>
         </div>
       </section>
-      </div>
+      {hoveredScoreInfo
+        ? createPortal(
+            <ScoreInfoTooltip score={hoveredScoreInfo.score} x={hoveredScoreInfo.x} y={hoveredScoreInfo.y} />,
+            document.body
+          )
+        : null}
     </div>
   )
 }

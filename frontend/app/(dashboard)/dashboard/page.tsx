@@ -258,7 +258,7 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
   const topRegions = metric.topRegions.slice(0, 3)
 
   return (
-    <div className='relative h-full overflow-hidden rounded-[1.65rem] border border-white/80 bg-white/75 p-3.5 shadow-[0_18px_40px_rgba(125,103,255,0.12)] backdrop-blur-xl'>
+    <div className='relative h-full overflow-hidden rounded-[1.65rem] border border-white/80 bg-white/75 p-2 shadow-[0_18px_40px_rgba(125,103,255,0.12)] backdrop-blur-xl'>
       <div
         className='pointer-events-none absolute inset-x-10 top-5 h-24 rounded-full blur-3xl'
         style={{ background: `radial-gradient(circle, ${metric.accentSoft}, transparent 72%)` }}
@@ -266,15 +266,14 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
       <div className='relative'>
         <div>
           <h2 className='text-base font-semibold text-slate-950'>Top Brain Regions</h2>
-          <p className='mt-1 text-[11px] whitespace-nowrap text-slate-600'>{metric.insight}</p>
         </div>
       </div>
 
-      <div className='mt-4 space-y-2'>
+      <div className='mt-2 space-y-1'>
         {topRegions.length > 0 ? (
           topRegions.map((region, index) => (
-            <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm'>
-              <div className='mb-1.5 flex items-center justify-between gap-3'>
+            <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-2.5 py-1.5 shadow-sm'>
+              <div className='flex items-center justify-between gap-3'>
                 <div className='flex items-center gap-3'>
                   <span
                     className='inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm'
@@ -285,20 +284,10 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
                   <span className='text-[12px] font-medium text-slate-900'>{region.name}</span>
                 </div>
               </div>
-              <div className='h-2 rounded-full bg-slate-100'>
-                <div
-                  className='h-full rounded-full transition-all duration-500'
-                  style={{
-                    width: `${region.contribution}%`,
-                    background: `linear-gradient(90deg, ${metric.accent}, ${metric.accent}bb)`,
-                    boxShadow: `0 0 18px ${metric.accent}55`,
-                  }}
-                />
-              </div>
             </div>
           ))
         ) : (
-          <div className='rounded-[0.95rem] border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-[12px] text-slate-500'>
+          <div className='rounded-[0.95rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-center text-[12px] text-slate-500'>
             No participant-level brain-region explanation is available for this metric yet.
           </div>
         )}
@@ -591,21 +580,17 @@ export default function DashboardPage() {
           </div>
 
           <div className='grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] xl:auto-rows-fr'>
-            <div className='rounded-[1.5rem] border border-white/80 bg-white/75 p-3 shadow-[0_16px_34px_rgba(56,189,248,0.09)] backdrop-blur-xl'>
-              <div className='mb-2 flex flex-wrap items-start justify-between gap-2'>
+            <div className='rounded-[1.5rem] border border-white/80 bg-white/75 p-2.5 shadow-[0_16px_34px_rgba(56,189,248,0.09)] backdrop-blur-xl'>
+              <div className='mb-1.5 flex flex-wrap items-start justify-between gap-2'>
                 <div>
                   <h2 className='text-base font-semibold text-slate-950'>{selectedMetric.label} Distribution</h2>
-                  <p className='mt-0.5 text-[12px] text-slate-600'>
-                    Adaptive axis range: {formatMetricValue(selectedMetric, selectedMetric.range[0])} to{' '}
-                    {formatMetricValue(selectedMetric, selectedMetric.range[1])}
-                  </p>
                 </div>
                 <div className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600'>
                   Percentile-aware cohort histogram
                 </div>
               </div>
 
-              <div className='h-[12.5rem]'>
+              <div className='h-[10.75rem]'>
                 <ResponsiveContainer width='100%' height='100%'>
                   <BarChart data={histogramData} margin={{ top: 12, right: 12, left: -12, bottom: 12 }} barCategoryGap={0} barGap={0}>
                     <CartesianGrid stroke='rgba(148,163,184,0.18)' vertical={false} />

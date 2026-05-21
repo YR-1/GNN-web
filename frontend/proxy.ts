@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+<<<<<<< HEAD
 const protectedRoutes = ['/dashboard', '/upload', '/history', '/predictions', '/analysis', '/model-performance']
+=======
+const protectedRoutes = ['/dashboard', '/upload', '/history', '/predictions', '/predictions2', '/analysis', '/model-performance']
+>>>>>>> origin/main
 const authRoutes = ['/login', '/signup']
 
 export function proxy(request: NextRequest) {

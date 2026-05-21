@@ -1,6 +1,24 @@
 import axios from 'axios'
 
+<<<<<<< HEAD
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+=======
+const DEFAULT_API_BASE_URL = 'http://localhost:8000'
+
+function normalizeApiBaseUrl(value?: string | null): string {
+  const candidate = value?.trim()
+  if (!candidate) return DEFAULT_API_BASE_URL
+
+  try {
+    const normalized = new URL(candidate).toString()
+    return normalized.replace(/\/$/, '')
+  } catch {
+    return DEFAULT_API_BASE_URL
+  }
+}
+
+export const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+>>>>>>> origin/main
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

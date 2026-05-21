@@ -89,7 +89,11 @@ export default function AnalysisResultPage({
           </p>
         </div>
         <div className='flex gap-2'>
+<<<<<<< HEAD
           <Link href={`/predictions?executionId=${executionId}`} className='btn-primary'>
+=======
+          <Link href={`/predictions2?executionId=${executionId}`} className='btn-primary'>
+>>>>>>> origin/main
             View predictions
           </Link>
         </div>

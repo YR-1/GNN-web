@@ -140,21 +140,12 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
   psqi: '#f97316',
 }
 
-<<<<<<< HEAD
-const PREDICTION_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
-const PREDICTION_SCORE_ALIASES: Record<string, string> = {
-  sustained_attention: 'picseq',
-}
-
-export default function PredictionsPage() {
-=======
 const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
 const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
   sustained_attention: 'picseq',
 }
 
 export default function Predictions2Page() {
->>>>>>> origin/main
   const router = useRouter()
   const activeAnalysis = useAnalysisStore((state) => state.active_analysis)
   const latestAnalysis = useAnalysisStore((state) => state.latest_analysis)
@@ -213,6 +204,7 @@ export default function Predictions2Page() {
   }, [activeAnalysis, latestAnalysis, router, setActiveAnalysis, setLatestAnalysis])
 
   const results = activeAnalysis?.results as CorrelationResults | undefined
+  const predictionErrors = results?.prediction_errors?.filter(Boolean) ?? []
 
   const modelPredictions = useMemo(() => {
     const byId: Record<string, SimulatedScoreResult> = {}
@@ -275,11 +267,7 @@ export default function Predictions2Page() {
     return values
   }, [results?.correlation_matrix, results?.model_registry, modelPredictions])
 
-<<<<<<< HEAD
-  const effectiveSelectedScoreId = selectedScoreId ? PREDICTION_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
-=======
   const effectiveSelectedScoreId = selectedScoreId ? PREDICTIONS2_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
->>>>>>> origin/main
 
   const selectedScore = useMemo(
     () =>
@@ -307,11 +295,7 @@ export default function Predictions2Page() {
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
-<<<<<<< HEAD
-  const metricScores = SCORE_REGISTRY.filter((score) => PREDICTION_SCORE_IDS.includes(score.id))
-=======
   const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
->>>>>>> origin/main
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
@@ -368,11 +352,7 @@ export default function Predictions2Page() {
           <Link href='/upload' className='btn-primary'>
             Upload data
           </Link>
-<<<<<<< HEAD
-          <Link href='/predictions' className='btn-secondary'>
-=======
           <Link href='/predictions2' className='btn-secondary'>
->>>>>>> origin/main
             Open Predictions
           </Link>
         </div>
@@ -452,6 +432,13 @@ export default function Predictions2Page() {
                     </div>
                   ) : null}
                 </div>
+
+                {predictionErrors.length > 0 ? (
+                  <div className='mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900'>
+                    <p className='font-medium'>Some model predictions are unavailable.</p>
+                    <p className='mt-1 break-words text-amber-800'>{predictionErrors.join(' | ')}</p>
+                  </div>
+                ) : null}
 
                 <div className='flex-1 space-y-2.5'>
                   {[

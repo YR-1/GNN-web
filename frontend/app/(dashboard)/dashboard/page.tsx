@@ -258,7 +258,7 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
   const topRegions = metric.topRegions.slice(0, 3)
 
   return (
-    <div className='relative h-full overflow-hidden rounded-[1.65rem] border border-white/80 bg-white/75 p-2 shadow-[0_18px_40px_rgba(125,103,255,0.12)] backdrop-blur-xl'>
+    <div className='relative h-full overflow-hidden rounded-[1.65rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
       <div
         className='pointer-events-none absolute inset-x-10 top-5 h-24 rounded-full blur-3xl'
         style={{ background: `radial-gradient(circle, ${metric.accentSoft}, transparent 72%)` }}
@@ -319,16 +319,17 @@ function BoxplotStrip({ metric }: { metric: DashboardMetric }) {
       <div className='relative mt-3 h-9'>
         <div className='absolute left-0 right-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-slate-200' />
         <div
-          className='absolute top-1/2 h-4.5 -translate-y-1/2 rounded-full'
+          className='absolute top-1/2 z-10 h-5 -translate-y-1/2 border'
           style={{
             left: `${toPercent(stats.q1)}%`,
-            width: `${Math.max(toPercent(stats.q3) - toPercent(stats.q1), 3)}%`,
-            background: `linear-gradient(90deg, ${metric.accentSoft}, ${metric.accent})`,
+            width: `${Math.max(toPercent(stats.q3) - toPercent(stats.q1), 6)}%`,
+            background: `${metric.accent}55`,
+            borderColor: `${metric.accent}55`,
             boxShadow: `0 10px 26px ${metric.accent}22`,
           }}
         />
         <div
-          className='absolute top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-slate-500'
+          className='absolute top-1/2 z-20 h-6 w-[3px] -translate-y-1/2 rounded-full bg-slate-600'
           style={{ left: `${toPercent(stats.median)}%` }}
         />
         <div
@@ -349,12 +350,27 @@ function BoxplotStrip({ metric }: { metric: DashboardMetric }) {
         <div className='absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-slate-500' style={{ left: `${toPercent(stats.max)}%` }} />
       </div>
 
-      <div className='mt-1.5 grid grid-cols-5 gap-1 text-[9px] text-slate-500'>
-        <div>Min: {formatMetricValue(metric, stats.min)}</div>
-        <div>Q1: {formatMetricValue(metric, stats.q1)}</div>
-        <div>Median: {formatMetricValue(metric, stats.median)}</div>
-        <div>Q3: {formatMetricValue(metric, stats.q3)}</div>
-        <div>Max: {formatMetricValue(metric, stats.max)}</div>
+      <div className='mt-1.5 grid grid-cols-5 gap-1.5 text-[11px] text-slate-500'>
+        <div className='leading-tight'>
+          <span className='block font-medium'>Min:</span>
+          <span className='block text-[12px] font-semibold text-slate-700'>{formatMetricValue(metric, stats.min)}</span>
+        </div>
+        <div className='leading-tight'>
+          <span className='block font-medium'>Q1:</span>
+          <span className='block text-[12px] font-semibold text-slate-700'>{formatMetricValue(metric, stats.q1)}</span>
+        </div>
+        <div className='leading-tight'>
+          <span className='block font-medium'>Median:</span>
+          <span className='block text-[12px] font-semibold text-slate-700'>{formatMetricValue(metric, stats.median)}</span>
+        </div>
+        <div className='leading-tight'>
+          <span className='block font-medium'>Q3:</span>
+          <span className='block text-[12px] font-semibold text-slate-700'>{formatMetricValue(metric, stats.q3)}</span>
+        </div>
+        <div className='leading-tight'>
+          <span className='block font-medium'>Max:</span>
+          <span className='block text-[12px] font-semibold text-slate-700'>{formatMetricValue(metric, stats.max)}</span>
+        </div>
       </div>
     </div>
   )
@@ -442,8 +458,11 @@ export default function DashboardPage() {
   if (!selectedMetric) {
     return (
       <div className='page-container'>
-        <div className='status-banner status-banner-info'>
-          <p>No completed prediction metrics are available for the dashboard yet.</p>
+        <div className='flex items-center justify-center py-16'>
+          <div className='text-center'>
+            <div className='loading-spinner mx-auto mb-3' />
+            <p className='text-ink-800'>Loading neuroanalytics dashboard...</p>
+          </div>
         </div>
       </div>
     )
@@ -480,35 +499,19 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className='space-y-2.5'>
-      <section className='relative overflow-hidden rounded-[1.75rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,248,255,0.92))] p-3 shadow-[0_20px_48px_rgba(123,97,255,0.12)] backdrop-blur-xl sm:p-3.5'>
-        <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,103,255,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_bottom,rgba(244,114,182,0.12),transparent_30%)]' />
-        <div className='relative space-y-2.5'>
-          <header className='flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between'>
-            <div className='min-w-0 flex-1 space-y-0.5'>
-              <div>
-                <h1 className='font-display text-lg font-semibold text-slate-950'>
-                  Population Brain Prediction Dashboard
-                </h1>
-                <p className='mt-0.5 max-w-[46rem] text-[11px] leading-[1.05rem] text-slate-600 sm:text-[12px]'>
-                  Research-grade monitoring for cohort-wide fMRI-derived behavioral predictions with adaptive scales,
-                  confidence overlays, and network-level interpretation cues.
-                </p>
-              </div>
-            </div>
+    <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-3 sm:px-4.5'>
+        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>
+          Population Brain Prediction Dashboard
+        </h1>
+        <p className='mt-0.5 text-[12px] text-slate-600'>
+          Cohort-wide fMRI-derived behavioral prediction monitoring.
+        </p>
+      </header>
 
-            <div className='grid shrink-0 gap-2 xl:min-w-[8.5rem]'>
-              <div className='rounded-[1rem] border border-white/80 bg-white/75 p-2 shadow-sm'>
-                <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Cohort Size</p>
-                <div className='mt-1 flex items-end justify-between gap-3'>
-                  <p className='text-[1.2rem] font-semibold text-slate-950'>{cohortSize}</p>
-                  <Users className='h-4 w-4 text-violet-500' />
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <div className='grid gap-1.5'>
+      <section className='bg-white p-4 sm:p-4.5'>
+        <div className='space-y-2.5'>
+          <div className='grid gap-2 xl:grid-cols-[minmax(0,1fr)_10rem] xl:items-start'>
             <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
               {dashboardMetrics.map((metric) => {
                 const active = metric.id === selectedMetric.id
@@ -520,7 +523,7 @@ export default function DashboardPage() {
                     className={`group relative overflow-hidden rounded-[1.05rem] border px-2.5 py-2 text-left transition-all duration-300 ${
                       active
                         ? 'shadow-[0_14px_26px_rgba(109,94,252,0.14)]'
-                        : 'border-white/80 bg-white/78 text-slate-900 shadow-sm hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-lg'
+                        : 'border-slate-200/80 bg-white text-slate-900 shadow-sm hover:-translate-y-0.5 hover:border-slate-300/80 hover:shadow-md'
                     }`}
                     style={
                       active
@@ -577,10 +580,20 @@ export default function DashboardPage() {
                 )
               })}
             </div>
+
+            <div className='grid shrink-0 gap-2'>
+              <div className='rounded-[1rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
+                <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Cohort Size</p>
+                <div className='mt-1 flex items-end justify-between gap-3'>
+                  <p className='text-[1.2rem] font-semibold text-slate-950'>{cohortSize}</p>
+                  <Users className='h-4 w-4 text-violet-500' />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className='grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] xl:auto-rows-fr'>
-            <div className='rounded-[1.5rem] border border-white/80 bg-white/75 p-2.5 shadow-[0_16px_34px_rgba(56,189,248,0.09)] backdrop-blur-xl'>
+            <div className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-2.5 shadow-sm'>
               <div className='mb-1.5 flex flex-wrap items-start justify-between gap-2'>
                 <div>
                   <h2 className='text-base font-semibold text-slate-950'>{selectedMetric.label} Distribution</h2>
@@ -641,13 +654,11 @@ export default function DashboardPage() {
             <BrainCard metric={selectedMetric} />
           </div>
 
-          <section className='rounded-[1.5rem] border border-white/80 bg-white/76 p-3 shadow-[0_16px_34px_rgba(244,114,182,0.08)] backdrop-blur-xl'>
+          <section className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-3 shadow-sm'>
             <div className='mb-2.5 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between'>
               <div>
                 <h2 className='text-base font-semibold text-slate-950'>Longitudinal Distribution Metrics</h2>
-                <p className='mt-0.5 text-[12px] text-slate-600'>
-                  Boxplots rendered with independent scaling per metric to preserve cohort spread, quartiles, and outliers.
-                </p>
+    
               </div>
               <div className='flex flex-wrap gap-2 text-[11px] font-medium text-slate-600'>
                 <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>variance analysis</span>
@@ -665,7 +676,7 @@ export default function DashboardPage() {
           </section>
 
           <section className='grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_18rem]'>
-            <div className='rounded-[1.5rem] border border-white/80 bg-white/76 p-3.5 shadow-sm'>
+            <div className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-3.5 shadow-sm'>
               <div className='mb-3 flex items-center justify-between gap-3'>
                 <div>
                   <h2 className='text-lg font-semibold text-slate-950'>Execution Pulse</h2>
@@ -694,7 +705,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className='rounded-[1.5rem] border border-white/80 bg-white/76 p-3.5 shadow-sm'>
+            <div className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-3.5 shadow-sm'>
               <h2 className='text-lg font-semibold text-slate-950'>Recent Runs</h2>
               <div className='mt-3 space-y-2'>
                 {safeStats.recentUploads.slice(0, 4).map((upload) => (

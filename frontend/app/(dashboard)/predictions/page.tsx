@@ -140,12 +140,12 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
   psqi: '#f97316',
 }
 
-const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
-const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
+const PREDICTION_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
+const PREDICTION_SCORE_ALIASES: Record<string, string> = {
   sustained_attention: 'picseq',
 }
 
-export default function Predictions2Page() {
+export default function PredictionsPage() {
   const router = useRouter()
   const activeAnalysis = useAnalysisStore((state) => state.active_analysis)
   const latestAnalysis = useAnalysisStore((state) => state.latest_analysis)
@@ -266,7 +266,7 @@ export default function Predictions2Page() {
     return values
   }, [results?.correlation_matrix, results?.model_registry, modelPredictions])
 
-  const effectiveSelectedScoreId = selectedScoreId ? PREDICTIONS2_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
+  const effectiveSelectedScoreId = selectedScoreId ? PREDICTION_SCORE_ALIASES[selectedScoreId] ?? selectedScoreId : null
 
   const selectedScore = useMemo(
     () =>
@@ -294,7 +294,7 @@ export default function Predictions2Page() {
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
-  const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
+  const metricScores = SCORE_REGISTRY.filter((score) => PREDICTION_SCORE_IDS.includes(score.id))
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
@@ -351,7 +351,7 @@ export default function Predictions2Page() {
           <Link href='/upload' className='btn-primary'>
             Upload data
           </Link>
-          <Link href='/predictions2' className='btn-secondary'>
+          <Link href='/predictions' className='btn-secondary'>
             Open Predictions
           </Link>
         </div>

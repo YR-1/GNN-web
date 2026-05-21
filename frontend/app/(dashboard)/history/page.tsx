@@ -408,7 +408,7 @@ export default function HistoryPage() {
   const activateAnalysis = async (executionId: string) => {
     if (analysisByExecution[executionId]) {
       setActiveAnalysis(analysisByExecution[executionId])
-      router.push('/predictions2')
+      router.push('/predictions')
       return
     }
 
@@ -418,7 +418,7 @@ export default function HistoryPage() {
       const analysis = response.data as AnalysisResponse
       setAnalysisByExecution((previous) => ({ ...previous, [executionId]: analysis }))
       setActiveAnalysis(analysis)
-      router.push('/predictions2')
+      router.push('/predictions')
     } catch (err: any) {
       if (err?.response?.status === 403 || err?.response?.status === 401) {
         router.push('/login')

@@ -322,7 +322,7 @@ function BoxplotStrip({ metric }: { metric: DashboardMetric }) {
           className='absolute top-1/2 z-10 h-5 -translate-y-1/2 border'
           style={{
             left: `${toPercent(stats.q1)}%`,
-            width: `${Math.max(toPercent(stats.q3) - toPercent(stats.q1), 6)}%`,
+            width: `${Math.max(toPercent(stats.q3) - toPercent(stats.q1), 0)}%`,
             background: `${metric.accent}55`,
             borderColor: `${metric.accent}55`,
             boxShadow: `0 10px 26px ${metric.accent}22`,

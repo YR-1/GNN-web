@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, ArrowUpDown, Check, ChevronDown, Download, FolderArchive, MoreVertical, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpDown, Check, ChevronDown, Download, MoreVertical, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { AnalysisResponse, HistoryItem, UploadContentPreview } from '@/lib/types'
+import type { AnalysisResponse, HistoryItem } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
 
 type HistoryStatus = 'completed' | 'processing' | 'queued' | 'failed'
@@ -24,7 +24,6 @@ type ToastState = {
 
 type HistoryRow = HistoryItem & {
   isSample?: boolean
-  isArchived?: boolean
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
@@ -237,17 +236,49 @@ function buildShareLink(uploadIds: string[]): string {
   return `${window.location.origin}/history/share?${params.toString()}`
 }
 
-function renderExportContent(item: HistoryRow, preview?: UploadContentPreview | null): string {
+function renderExportContent(item: HistoryRow, analysis?: AnalysisResponse | null): string {
+  const results = analysis?.results
+  const predictedScores = results?.predicted_scores ?? []
+  const explainedScores = results?.explained_scores ?? []
+
   return [
-    `MindPulse Neural Data Export`,
+    `MindPulse Prediction Results Export`,
     `File Name: ${item.file_name}`,
     `Upload ID: ${item.upload_id}`,
     `Execution ID: ${item.execution_id ?? 'N/A'}`,
     `Status: ${statusLabel(item.status)}`,
     `Uploaded At: ${item.uploaded_at}`,
     '',
-    'Preview:',
-    preview?.content || 'Preview unavailable. This export contains metadata only.',
+    'Predicted Scores:',
+    predictedScores.length > 0
+      ? predictedScores
+          .map((score) => {
+            const value = typeof score.value === 'number' ? score.value.toFixed(3) : 'N/A'
+            const interval =
+              typeof score.ci95_lower === 'number' && typeof score.ci95_upper === 'number'
+                ? ` (95% CI ${score.ci95_lower.toFixed(3)} to ${score.ci95_upper.toFixed(3)})`
+                : ''
+            return `- ${score.score_id}: ${value}${interval}`
+          })
+          .join('\n')
+      : 'Prediction results unavailable.',
+    '',
+    'Top Explanation Signals:',
+    explainedScores.length > 0
+      ? explainedScores
+          .map((score) => {
+            const topEdge = score.top_edges?.[0]
+            if (topEdge?.source_label && topEdge?.target_label) {
+              return `- ${score.score_id}: ${topEdge.source_label} <-> ${topEdge.target_label} (importance ${topEdge.importance.toFixed(3)})`
+            }
+            const topRoi = score.roi_importance?.[0]
+            if (topRoi?.label) {
+              return `- ${score.score_id}: ${topRoi.label} (importance ${topRoi.importance.toFixed(3)})`
+            }
+            return `- ${score.score_id}: Explanation available`
+          })
+          .join('\n')
+      : 'Explanation details unavailable.',
   ].join('\n')
 }
 
@@ -277,20 +308,20 @@ function ModalShell({
 
   return createPortal(
     <div
-      className='fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 px-4'
+      className='fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-[2px]'
       onClick={onClose}
     >
       <div
-        className='w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl'
+        className='w-full max-w-lg rounded-[1.9rem] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,255,0.96))] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.12)]'
         onClick={(event) => event.stopPropagation()}
       >
         {title ? (
           <div className='mb-5 flex items-start justify-between gap-4'>
-            <h2 className='text-xl font-semibold text-slate-950'>{title}</h2>
+            <h2 className='font-display text-[1.15rem] font-semibold text-slate-950'>{title}</h2>
             <button
               type='button'
               onClick={onClose}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700'
+              className='inline-flex h-9 w-9 items-center justify-center rounded-[1rem] border border-slate-200 bg-white/85 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700'
             >
               <X className='h-4 w-4' />
             </button>
@@ -300,7 +331,7 @@ function ModalShell({
             <button
               type='button'
               onClick={onClose}
-              className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700'
+              className='inline-flex h-9 w-9 items-center justify-center rounded-[1rem] border border-slate-200 bg-white/85 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700'
             >
               <X className='h-4 w-4' />
             </button>
@@ -318,7 +349,6 @@ export default function HistoryPage() {
   const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)
 
   const [history, setHistory] = useState<HistoryItem[]>([])
-  const [archivedIds, setArchivedIds] = useState<string[]>([])
   const [analysisByExecution, setAnalysisByExecution] = useState<Record<string, AnalysisResponse>>({})
   const [analysisLoading, setAnalysisLoading] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -337,7 +367,6 @@ export default function HistoryPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [downloading, setDownloading] = useState(false)
-  const [showArchivedOnly, setShowArchivedOnly] = useState(false)
   const [showSampleRows, setShowSampleRows] = useState(false)
 
   useEffect(() => {
@@ -363,14 +392,11 @@ export default function HistoryPage() {
 
   const rows = useMemo<HistoryRow[]>(() => {
     const baseRows = history.length > 0 ? history : showSampleRows ? SAMPLE_HISTORY : []
-    return baseRows.map((item) => ({
-      ...item,
-      isArchived: archivedIds.includes(item.upload_id),
-    }))
-  }, [archivedIds, history, showSampleRows])
+    return baseRows
+  }, [history, showSampleRows])
 
   const filteredHistory = useMemo(() => {
-    let items = rows.filter((item) => Boolean(item.isArchived) === showArchivedOnly)
+    let items = rows
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -440,24 +466,6 @@ export default function HistoryPage() {
     )
   }
 
-  const handleArchiveSelected = () => {
-    if (selectedRows.length === 0) return
-    setArchivedIds((current) => [...new Set([...current, ...selectedRows.map((item) => item.upload_id)])])
-    setSelectedIds([])
-    setToast({ message: 'Items moved to archive.', tone: 'success' })
-  }
-  void handleArchiveSelected
-
-  const handleRestoreSelected = () => {
-    if (selectedRows.length === 0) return
-    setArchivedIds((current) => current.filter((id) => !selectedRows.some((item) => item.upload_id === id)))
-    setSelectedIds([])
-    setToast({
-      message: `${selectedRows.length} item${selectedRows.length === 1 ? '' : 's'} restored to active files.`,
-      tone: 'success',
-    })
-  }
-
   const handleDeleteSelected = () => {
     if (selectedRows.length === 0) return
     setDeleteModalOpen(true)
@@ -470,13 +478,11 @@ export default function HistoryPage() {
     }
     const idsToDelete = [...selectedIds]
     const previousHistory = history
-    const previousArchivedIds = archivedIds
 
     setError('')
     setToast(null)
     setDeleteModalOpen(false)
     setHistory((current) => current.filter((item) => !idsToDelete.includes(item.upload_id)))
-    setArchivedIds((current) => current.filter((id) => !idsToDelete.includes(id)))
     setSelectedIds([])
     setToast({
       message: `${idsToDelete.length} file${idsToDelete.length === 1 ? '' : 's'} removed from system.`,
@@ -492,7 +498,6 @@ export default function HistoryPage() {
       .then(() => {})
       .catch(() => {
         setHistory(previousHistory)
-        setArchivedIds(previousArchivedIds)
         setToast({
           message: 'Delete failed. Restoring items to list.',
           tone: 'error',
@@ -514,7 +519,6 @@ export default function HistoryPage() {
       setError('Unable to copy the shareable link.')
     }
   }
-  void handleRestoreSelected
 
 
   const handleSendShare = () => {
@@ -531,19 +535,19 @@ export default function HistoryPage() {
     try {
       const exportFiles = await Promise.all(
         selectedRows.map(async (item) => {
-          let preview: UploadContentPreview | null = null
-          if (!item.isSample) {
+          let analysis: AnalysisResponse | null = null
+          if (!item.isSample && item.execution_id) {
             try {
-              const response = await api.getUploadContent(item.upload_id, { max_lines: 120, max_chars: 12000 })
-              preview = response.data as UploadContentPreview
+              const response = await api.getAnalysis(item.execution_id)
+              analysis = response.data as AnalysisResponse
             } catch {
-              preview = null
+              analysis = null
             }
           }
 
           return {
             name: `${sanitizeFileName(item.file_name)}.report.txt`,
-            content: renderExportContent(item, preview),
+            content: renderExportContent(item, analysis),
           }
         })
       )
@@ -579,18 +583,6 @@ export default function HistoryPage() {
             <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>History</h1>
             <p className='text-[12px] text-slate-600'>Manage and review your neural data processing history.</p>
           </div>
-          <button
-            type='button'
-            onClick={() => {
-              setShowArchivedOnly((current) => !current)
-              setSelectedIds([])
-              setToast(null)
-            }}
-            className='inline-flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white/90 px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white'
-          >
-            <FolderArchive className='h-4 w-4' />
-            <span>{showArchivedOnly ? 'View Active Files' : 'View Archive'}</span>
-          </button>
         </div>
       </header>
 
@@ -662,58 +654,6 @@ export default function HistoryPage() {
             <Trash2 className='h-4 w-4' />
           </button>
 
-          <div className='relative'>
-            <button
-              type='button'
-              onClick={() => setStatusMenuOpen((current) => !current)}
-              className='inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
-            >
-              <SlidersHorizontal className='h-4 w-4' />
-              <span>Status</span>
-              {statusFilter !== 'all' ? (
-                <span className='rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700'>
-                  {statusLabel(statusFilter)}
-                </span>
-              ) : null}
-              <ChevronDown className='h-4 w-4' />
-            </button>
-
-            {statusMenuOpen ? (
-              <div className='absolute right-0 top-10 z-20 min-w-[190px] rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl'>
-                {STATUS_OPTIONS.map((option) => {
-                  const active = statusFilter === option.value
-                  return (
-                    <button
-                      key={option.value}
-                      type='button'
-                      onClick={() => {
-                        setStatusFilter(option.value)
-                        setStatusMenuOpen(false)
-                      }}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
-                        active
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                      {active ? <Check className='h-4 w-4' /> : null}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type='button'
-            onClick={() => setSortNewest((current) => !current)}
-            className='inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
-            title={`Current sort: ${sortNewest ? 'Newest first' : 'Oldest first'}`}
-          >
-            <ArrowUpDown className='h-4 w-4' />
-            <span>Sort</span>
-          </button>
         </div>
       </section>
 
@@ -737,19 +677,10 @@ export default function HistoryPage() {
           </div>
         </div>
       ) : (
-        <section className={`overflow-hidden rounded-2xl border shadow-sm ${
-          showArchivedOnly
-            ? 'border-purple-200/80 bg-purple-50/35'
-            : 'border-slate-200/80 bg-white'
-        }`}>
-          {showArchivedOnly ? (
-            <div className='border-b border-purple-200/70 bg-purple-50/90 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-purple-700'>
-              Archived View
-            </div>
-          ) : null}
+        <section className='overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm'>
           <div className='overflow-x-auto'>
             <table className='min-w-full border-separate border-spacing-0'>
-              <thead className={showArchivedOnly ? 'bg-purple-50/80' : 'bg-slate-50/90'}>
+              <thead className='bg-slate-50/90'>
                 <tr>
                   <th className='border-b border-slate-200 px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
                     <div className='flex items-center gap-3'>
@@ -759,14 +690,60 @@ export default function HistoryPage() {
                         onChange={toggleSelectAll}
                         className='h-4 w-4 rounded border-slate-300 accent-indigo-600'
                       />
-                      <span>{showArchivedOnly ? 'File Name / Archived' : 'File Name'}</span>
+                      <span>File Name</span>
                     </div>
                   </th>
                   <th className='border-b border-slate-200 px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
-                    Upload Date
+                    <button
+                      type='button'
+                      onClick={() => setSortNewest((current) => !current)}
+                      className='inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-700'
+                      title={`Current sort: ${sortNewest ? 'Newest first' : 'Oldest first'}`}
+                    >
+                      <span>Upload Date</span>
+                      <ArrowUpDown className='h-3.5 w-3.5' />
+                    </button>
                   </th>
-                  <th className='border-b border-slate-200 px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
-                    Status
+                  <th className='relative border-b border-slate-200 px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
+                    <button
+                      type='button'
+                      onClick={() => setStatusMenuOpen((current) => !current)}
+                      className='inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-700'
+                    >
+                      <span>Status</span>
+                      {statusFilter !== 'all' ? (
+                        <span className='rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold tracking-normal text-indigo-700'>
+                          {statusLabel(statusFilter)}
+                        </span>
+                      ) : null}
+                      <ChevronDown className='h-3.5 w-3.5' />
+                    </button>
+
+                    {statusMenuOpen ? (
+                      <div className='absolute left-6 top-[calc(100%-0.25rem)] z-20 mt-2 min-w-[190px] rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl'>
+                        {STATUS_OPTIONS.map((option) => {
+                          const active = statusFilter === option.value
+                          return (
+                            <button
+                              key={option.value}
+                              type='button'
+                              onClick={() => {
+                                setStatusFilter(option.value)
+                                setStatusMenuOpen(false)
+                              }}
+                              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm normal-case tracking-normal transition ${
+                                active
+                                  ? 'bg-indigo-50 text-indigo-700'
+                                  : 'text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span>{option.label}</span>
+                              {active ? <Check className='h-4 w-4' /> : null}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
                   </th>
                   <th className='border-b border-slate-200 px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
                     Action
@@ -789,8 +766,8 @@ export default function HistoryPage() {
                     const isAnalysisLoading = item.execution_id ? analysisLoading[item.execution_id] : false
 
                     return (
-                      <tr key={item.upload_id} className={item.isArchived ? 'bg-purple-50/35' : ''}>
-                        <td className={`px-6 py-5 ${item.isArchived ? 'border-b border-purple-100' : 'border-b border-slate-100'}`}>
+                      <tr key={item.upload_id}>
+                        <td className='border-b border-slate-100 px-6 py-5'>
                           <div className='flex items-center gap-3'>
                             <input
                               type='checkbox'
@@ -816,28 +793,23 @@ export default function HistoryPage() {
                               <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500'>
                                 {item.execution_id ? <span className='mono-data'>ID: {item.execution_id}</span> : null}
                                 {item.isSample ? <span>Sample dataset</span> : null}
-                                {item.isArchived ? (
-                                  <span className='rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-purple-700'>
-                                    Archived
-                                  </span>
-                                ) : null}
                               </div>
                             </div>
                           </div>
                         </td>
 
-                        <td className={`px-6 py-5 text-sm text-slate-600 ${item.isArchived ? 'border-b border-purple-100' : 'border-b border-slate-100'}`}>
+                        <td className='border-b border-slate-100 px-6 py-5 text-sm text-slate-600'>
                           {formatUploadDate(item.uploaded_at)}
                         </td>
 
-                        <td className={`px-6 py-5 ${item.isArchived ? 'border-b border-purple-100' : 'border-b border-slate-100'}`}>
+                        <td className='border-b border-slate-100 px-6 py-5'>
                           <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusBadgeClass[itemStatus]}`}>
                             <span className={`h-2 w-2 rounded-full ${statusDotClass[itemStatus]}`} />
                             {statusLabel(item.status)}
                           </span>
                         </td>
 
-                        <td className={`px-6 py-5 text-right ${item.isArchived ? 'border-b border-purple-100' : 'border-b border-slate-100'}`}>
+                        <td className='border-b border-slate-100 px-6 py-5 text-right'>
                           <button
                             type='button'
                             onClick={() => {
@@ -941,15 +913,15 @@ export default function HistoryPage() {
 
       {deleteModalOpen ? (
         <ModalShell title='' onClose={() => setDeleteModalOpen(false)}>
-          <div className='space-y-6'>
-            <div className='space-y-4'>
+          <div className='space-y-5'>
+            <div className='space-y-3'>
               <div className='flex items-start gap-3'>
-                <span className='inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600'>
-                  <AlertTriangle className='h-6 w-6' />
+                <span className='inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-rose-100 bg-rose-50/85 text-rose-500'>
+                  <AlertTriangle className='h-5 w-5' />
                 </span>
-                <div className='space-y-2'>
-                  <h2 className='text-3xl font-semibold tracking-tight text-slate-950'>Delete Files?</h2>
-                  <p className='text-base leading-7 text-slate-600'>
+                <div className='space-y-1.5'>
+                  <h2 className='font-display text-[1.7rem] font-semibold tracking-tight text-slate-950'>Delete Files?</h2>
+                  <p className='max-w-[28rem] text-[15px] leading-7 text-slate-600'>
                     Are you sure you want to delete {selectedRows.length} selected file{selectedRows.length === 1 ? '' : 's'}? This action cannot be undone.
                   </p>
                 </div>
@@ -960,14 +932,14 @@ export default function HistoryPage() {
               <button
                 type='button'
                 onClick={() => setDeleteModalOpen(false)}
-                className='inline-flex h-14 items-center justify-center rounded-full border border-rose-100 bg-white px-8 text-base font-medium text-slate-700 transition hover:bg-slate-50 sm:min-w-[180px]'
+                className='inline-flex h-12 items-center justify-center rounded-[1.25rem] border border-slate-200 bg-white px-7 text-[15px] font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:min-w-[168px]'
               >
                 Cancel
               </button>
               <button
                 type='button'
                 onClick={confirmDeleteSelected}
-                className='inline-flex h-14 items-center justify-center rounded-full bg-indigo-950 px-8 text-base font-semibold text-white shadow-lg shadow-indigo-950/15 transition hover:bg-indigo-900 sm:min-w-[180px]'
+                className='inline-flex h-12 items-center justify-center rounded-[1.25rem] border border-indigo-200 bg-indigo-50 px-7 text-[15px] font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:min-w-[168px]'
               >
                 Delete
               </button>

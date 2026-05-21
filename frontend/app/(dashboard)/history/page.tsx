@@ -572,12 +572,12 @@ export default function HistoryPage() {
   const selectedCount = selectedIds.length
 
   return (
-    <div className='surface-card-strong space-y-6'>
-      <header className='space-y-2'>
+    <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-3 sm:px-4.5'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-          <div className='space-y-2'>
-            <h1 className='text-3xl font-semibold text-slate-950'>History</h1>
-            <p className='text-sm text-slate-500'>Manage and review your neural data processing history.</p>
+          <div className='space-y-1'>
+            <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>History</h1>
+            <p className='text-[12px] text-slate-600'>Manage and review your neural data processing history.</p>
           </div>
           <button
             type='button'
@@ -586,7 +586,7 @@ export default function HistoryPage() {
               setSelectedIds([])
               setToast(null)
             }}
-            className='inline-flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
+            className='inline-flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white/90 px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white'
           >
             <FolderArchive className='h-4 w-4' />
             <span>{showArchivedOnly ? 'View Active Files' : 'View Archive'}</span>
@@ -594,7 +594,8 @@ export default function HistoryPage() {
         </div>
       </header>
 
-      <section className='flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/88 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
+      <section className='space-y-6 bg-white p-4 sm:p-4.5'>
+      <section className='flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/75 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
         <div className='flex w-full max-w-4xl flex-col gap-3 lg:flex-row lg:items-center'>
           <div className='relative w-full max-w-xl'>
             <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
@@ -974,7 +975,7 @@ export default function HistoryPage() {
           </div>
         </ModalShell>
       ) : null}
-
+      </section>
     </div>
   )
 }

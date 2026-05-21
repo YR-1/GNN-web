@@ -82,16 +82,19 @@ export default function ModelPerformancePage() {
   }
 
   return (
-    <div className='page-container space-y-6'>
-      <header>
-        <h1 className='section-title'>Model Performance</h1>
-        <p className='section-subtitle max-w-3xl'>
+    <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-3 sm:px-4.5'>
+        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>
+          Model Performance
+        </h1>
+        <p className='mt-0.5 max-w-3xl text-[12px] text-slate-600'>
           Performance metrics computed on a held-out test set. Each model predicts a behavioral score from
           fMRI functional connectivity patterns using graph neural network architectures.
         </p>
       </header>
 
-      <Card className='bg-white border-blue-100 shadow-sm'>
+      <div className='space-y-6 bg-white p-4 sm:p-4.5'>
+      <Card className='border-blue-100 bg-white shadow-sm'>
         <div className='bg-gradient-to-r from-blue-50 to-blue-100/50 border-b border-blue-100 p-5'>
           <h2 className='text-blue-900 font-semibold'>Model Performance Metrics</h2>
           <p className='text-sm text-slate-600 mt-2'>
@@ -211,9 +214,10 @@ export default function ModelPerformancePage() {
       </Card>
 
 
-      <div className='text-center text-sm text-slate-500 py-2'>
+      <div className='py-2 text-center text-sm text-slate-500'>
         <p>Models trained using graph neural networks on functional connectivity data</p>
         <p className='mt-1'>Test set: N=50 subjects, held-out from training</p>
+      </div>
       </div>
     </div>
   )

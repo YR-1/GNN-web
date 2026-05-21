@@ -147,26 +147,30 @@ export default function UploadPage() {
   }
 
   return (
-    <div className='page-container w-full max-w-5xl mx-auto'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
-        <div>
-          <h1 className='section-title'>Upload Data</h1>
-          <p className='section-subtitle'>
-            Add one or more ROI time-series matrices to start connectivity analysis and prediction.
+    <div className='mx-auto w-full max-w-5xl overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-3 sm:px-4.5'>
+        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>
+          Upload Data
+        </h1>
+        <p className='mt-0.5 text-[12px] text-slate-600'>
+          Add one or more ROI time-series matrices to start connectivity analysis and prediction.
+        </p>
+      </header>
+
+      <section className='space-y-4 bg-white p-4 sm:p-4.5'>
+        <div className='flex justify-end'>
+          <p className='rounded-full border border-brand-400/20 bg-brand-50/80 px-3 py-1 text-xs font-medium text-ink-700'>
+            Research workflow
           </p>
         </div>
-        <p className='rounded-full border border-brand-400/20 bg-white/70 px-3 py-1 text-xs font-medium text-ink-700'>
-          Research workflow
-        </p>
-      </div>
 
-      {error && (
-        <div className='status-banner status-banner-error'>
-          <p>{error}</p>
-        </div>
-      )}
+        {error && (
+          <div className='status-banner status-banner-error'>
+            <p>{error}</p>
+          </div>
+        )}
 
-      <form onSubmit={handleUpload} className='grid gap-5 lg:grid-cols-[1.45fr_0.95fr]'>
+        <form onSubmit={handleUpload} className='grid gap-5 lg:grid-cols-[1.45fr_0.95fr]'>
         <div className=' space-y-4'>
             <div
               role='button'
@@ -345,6 +349,7 @@ export default function UploadPage() {
         <div className='rounded-xl border border-brand-400/20 bg-white/70 px-4 py-3 text-xs text-ink-700'>
           Tip: If your matrix was exported as ROI x timepoints, the backend auto-detects and transposes it when possible.
         </div>
+      </section>
     </div>
   )
 }

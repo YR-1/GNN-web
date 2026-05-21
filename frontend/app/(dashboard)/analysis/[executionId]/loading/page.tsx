@@ -17,8 +17,8 @@ const targetProgressByStatus: Record<ExecutionStatusValue, number> = {
 }
 
 const fallbackStatusMessage: Record<ExecutionStatusValue, string> = {
-  queued: 'Waiting for the analysis job to start on the server.',
-  processing: 'Computing connectivity, generating outputs, and preparing predictions.',
+  queued: 'Converting your brain data into a connectivity graph for the model.',
+  processing: 'Analyzing the brain graph and predicting your behavioral scores.',
   completed: 'Analysis finished. Preparing to open the results.',
   failed: 'The analysis stopped before completion.',
 }

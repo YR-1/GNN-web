@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { getROILabel } from '@/lib/shen268-labels'
@@ -81,7 +82,43 @@ function formatPredictionValue(value: number, scoreDef: ScoreDefinition, valueSc
 
 function formatRangeLabel(scoreDef: ScoreDefinition): string {
   const [min, max] = scoreDef.scoreRange
-  return `Range: ${formatValue(min, scoreDef)} - ${formatValue(max, scoreDef)}`
+  const formatRangeValue = (value: number) => (Number.isInteger(value) ? value.toString() : formatValue(value, scoreDef))
+  return `Range: ${formatRangeValue(min)} - ${formatRangeValue(max)}`
+}
+
+function ScoreInfoTooltip({ score, x, y }: { score: ScoreDefinition; x: number; y: number }) {
+  return (
+    <div
+      className='pointer-events-none fixed z-[9999] w-80 max-w-[calc(100vw-3rem)] rounded-[0.9rem] border border-slate-200 bg-white p-3 text-left shadow-xl ring-1 ring-slate-900/5'
+      style={{ left: x, top: y }}
+    >
+      <p className='text-[12px] font-semibold leading-snug text-slate-950'>{score.name}</p>
+      <div className='mt-2 grid gap-1.5 text-[11px] text-slate-700'>
+        {score.domain || score.construct ? (
+          <div>
+            <span className='font-semibold text-slate-950'>Area: </span>
+            {[score.domain, score.construct].filter(Boolean).join(' - ')}
+          </div>
+        ) : null}
+        <div>
+          <span className='font-semibold text-slate-950'>Measures: </span>
+          {score.detail ?? score.description}
+        </div>
+        {score.measureName ? (
+          <div>
+            <span className='font-semibold text-slate-950'>Full measure: </span>
+            {score.measureName}
+          </div>
+        ) : null}
+      </div>
+      {score.interpretation ? (
+        <div className='mt-2 rounded-[0.65rem] bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-700'>
+          <span className='font-semibold text-slate-950'>How to read it: </span>
+          {score.interpretation}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function scorePercent(value: number, scoreDef: ScoreDefinition): number {
@@ -158,6 +195,23 @@ export default function Predictions2Page() {
   const [error, setError] = useState('')
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
   const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
+  const [hoveredScoreInfo, setHoveredScoreInfo] = useState<{ score: ScoreDefinition; x: number; y: number } | null>(null)
+
+  const showScoreInfo = (score: ScoreDefinition, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const tooltipWidth = 320
+    const viewportPadding = 12
+    const x = Math.min(
+      Math.max(rect.left, viewportPadding),
+      window.innerWidth - tooltipWidth - viewportPadding
+    )
+
+    setHoveredScoreInfo({
+      score,
+      x,
+      y: rect.bottom + 8,
+    })
+  }
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -458,10 +512,19 @@ export default function Predictions2Page() {
                           const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
 
                           return (
-                            <button
+                            <div
                               key={score.id}
-                              type='button'
-                              onClick={() => setSelectedScoreId(score.id)}
+                              role='button'
+                              tabIndex={0}
+                              onClick={() => {
+                                setSelectedScoreId(score.id)
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setSelectedScoreId(score.id)
+                                }
+                              }}
                               className={`w-full rounded-[0.95rem] border px-3 py-2 text-left transition ${
                                 selectedScore?.id === score.id
                                   ? 'border-slate-300 bg-slate-100 shadow-sm'
@@ -473,15 +536,22 @@ export default function Predictions2Page() {
                                   <div className='flex items-center gap-1.5'>
                                     <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
                                     <span
-                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
-                                      title={score.description}
+                                      className='inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500 transition hover:border-slate-500 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300'
+                                      role='img'
+                                      tabIndex={0}
                                       aria-label={`${score.name} info`}
+                                      onMouseEnter={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onMouseLeave={() => setHoveredScoreInfo(null)}
+                                      onFocus={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onBlur={() => setHoveredScoreInfo(null)}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                      }}
                                     >
                                       <Info className='h-2.5 w-2.5' />
                                     </span>
                                   </div>
                                   <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
-                                    <p className='text-slate-500'>{score.unit}</p>
                                     <p className='text-slate-400'>{formatRangeLabel(score)}</p>
                                   </div>
                                 </div>
@@ -500,7 +570,7 @@ export default function Predictions2Page() {
                                   }}
                                 />
                               </div>
-                            </button>
+                            </div>
                           )
                         })}
                       </div>
@@ -550,6 +620,12 @@ export default function Predictions2Page() {
           </section>
         </div>
       </section>
+      {hoveredScoreInfo
+        ? createPortal(
+            <ScoreInfoTooltip score={hoveredScoreInfo.score} x={hoveredScoreInfo.x} y={hoveredScoreInfo.y} />,
+            document.body
+          )
+        : null}
     </div>
   )
 }

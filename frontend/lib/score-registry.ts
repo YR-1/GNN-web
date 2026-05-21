@@ -83,7 +83,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
   },
   {
     id: 'emotsupp_unadj',
-    name: 'Emotion Support',
+    name: 'EmotSupp (Emotional Support)',
     shortName: 'Emotion',
     category: 'emotion',
     description: 'Ability to receive emotional support from others.',

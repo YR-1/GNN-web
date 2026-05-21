@@ -194,7 +194,7 @@ class SupabaseDbService:
             "listsort_ageadj": "listsort_fbnetgen_importance_top100.json",
             "pmat": "pmat_braingnn_importance_top100.json",
             "picseq": "picseq_fbnetgen_importance_top100.json",
-            "emotion_recognition": "emotsupp_reggnn_importance_top100.json",
+            "emotsupp_unadj": "emotsupp_reggnn_importance_top100.json",
             "emotsupp_unadj": "emotsupp_reggnn_importance_top100.json",
             "psqi": "psqi_reggnn_importance_top100.json",
         }
@@ -653,11 +653,11 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "range": [50.0, 150.0],
                 "defaultInsight": "Picture-sequence memory patterns reflect distributed episodic-memory and associative network coordination.",
             },
-            "emotion_recognition": {
-                "label": "Emotion Recognition",
-                "shortLabel": "Emotion",
+            "emotsupp_unadj": {
+                "label": "EmotSupp (Emotional Support)",
+                "shortLabel": "EmotSupp",
                 "range": [0.0, 100.0],
-                "defaultInsight": "Emotion recognition is associated with temporal-limbic and orbitofrontal coordination.",
+                "defaultInsight": "Perceived emotional support reflects default-mode and limbic coordination.",
             },
             "psqi": {
                 "label": "PSQI (Sleep Quality)",
@@ -668,7 +668,7 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
         }
         metric_aliases = {
             "sustained_attention": "picseq",
-            "emotsupp_unadj": "emotion_recognition",
+            "emotsupp_unadj": "emotsupp_unadj",
         }
 
         uploads_resp = (

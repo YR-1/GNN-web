@@ -42,7 +42,7 @@ type DashboardMetric = {
 }
 
 type HistogramBin = {
-  label: string
+  x: number
   count: number
   percentile: string
   rangeText: string
@@ -56,8 +56,8 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     range: [50, 150],
     average: 96,
     trend: 2.4,
-    accent: '#7c3aed',
-    accentSoft: '#ede9fe',
+    accent: '#3B82F6',
+    accentSoft: '#DBEAFE',
     distribution: [61, 68, 72, 78, 83, 87, 91, 96, 101, 106, 110, 116, 121, 128, 134],
     cohortSplit: [91.2, 101.4],
     confidence: 0.92,
@@ -78,8 +78,8 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     range: [0, 24],
     average: 16.1,
     trend: 3.1,
-    accent: '#a855f7',
-    accentSoft: '#f3e8ff',
+    accent: '#8B5CF6',
+    accentSoft: '#EDE9FE',
     distribution: [4.2, 6.1, 7.8, 9.2, 10.4, 11.9, 13.1, 14.7, 16.1, 17.2, 18.3, 19.1, 20.4, 21.3, 22.2],
     cohortSplit: [14.8, 17.6],
     confidence: 0.94,
@@ -100,8 +100,8 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     range: [0, 1],
     average: 0.53,
     trend: 1.9,
-    accent: '#ec4899',
-    accentSoft: '#fce7f3',
+    accent: '#EC4899',
+    accentSoft: '#FCE7F3',
     distribution: [0.08, 0.13, 0.19, 0.24, 0.29, 0.35, 0.41, 0.47, 0.53, 0.58, 0.64, 0.71, 0.77, 0.84, 0.91],
     cohortSplit: [0.47, 0.59],
     confidence: 0.9,
@@ -122,8 +122,8 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     range: [0, 100],
     average: 77,
     trend: 4.2,
-    accent: '#ef4444',
-    accentSoft: '#fee2e2',
+    accent: '#EF4444',
+    accentSoft: '#FEE2E2',
     distribution: [29, 36, 42, 48, 54, 60, 66, 71, 77, 81, 84, 88, 91, 94, 97],
     cohortSplit: [72.8, 80.9],
     confidence: 0.88,
@@ -144,8 +144,8 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     range: [0, 21],
     average: 13.1,
     trend: -2.7,
-    accent: '#f97316',
-    accentSoft: '#ffedd5',
+    accent: '#F97316',
+    accentSoft: '#FFEDD5',
     distribution: [2.1, 3.9, 5.4, 6.8, 8.1, 9.6, 10.7, 11.9, 13.1, 14.2, 15.4, 16.3, 17.4, 18.6, 19.8],
     cohortSplit: [12.2, 14.5],
     confidence: 0.9,
@@ -162,11 +162,11 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
 ]
 
 const METRIC_VISUALS: Record<string, Pick<DashboardMetric, 'accent' | 'accentSoft'>> = {
-  listsort_ageadj: { accent: '#7c3aed', accentSoft: '#ede9fe' },
-  pmat: { accent: '#a855f7', accentSoft: '#f3e8ff' },
-  sustained_attention: { accent: '#ec4899', accentSoft: '#fce7f3' },
-  emotion_recognition: { accent: '#ef4444', accentSoft: '#fee2e2' },
-  psqi: { accent: '#f97316', accentSoft: '#ffedd5' },
+  listsort_ageadj: { accent: '#3B82F6', accentSoft: '#DBEAFE' },
+  pmat: { accent: '#8B5CF6', accentSoft: '#EDE9FE' },
+  sustained_attention: { accent: '#EC4899', accentSoft: '#FCE7F3' },
+  emotion_recognition: { accent: '#EF4444', accentSoft: '#FEE2E2' },
+  psqi: { accent: '#F97316', accentSoft: '#FFEDD5' },
 }
 
 function formatMetricValue(metric: DashboardMetric, value: number): string {
@@ -190,23 +190,34 @@ function quantile(values: number[], percentile: number): number {
 function buildHistogram(metric: DashboardMetric): HistogramBin[] {
   const values = [...metric.distribution].sort((a, b) => a - b)
   const [min, max] = metric.range
-  const binCount = 7
-  const width = (max - min) / binCount
+  const width = getHistogramStep(metric)
+  const binCount = Math.max(1, Math.ceil((max - min) / width))
   const bins = Array.from({ length: binCount }, (_, index) => {
     const start = min + index * width
-    const end = index === binCount - 1 ? max : start + width
+    const end = Math.min(max, start + width)
     const inBin = values.filter((value) => {
       if (index === binCount - 1) return value >= start && value <= end
       return value >= start && value < end
     })
     return {
-      label: `${formatMetricValue(metric, start)}-${formatMetricValue(metric, end)}`,
+      x: start + width / 2,
       count: inBin.length,
       percentile: `${Math.round(((index + 1) / binCount) * 100)}th`,
       rangeText: `${formatMetricValue(metric, start)} to ${formatMetricValue(metric, end)}`,
     }
   })
   return bins
+}
+
+function getHistogramStep(metric: DashboardMetric): number {
+  const [min, max] = metric.range
+  const span = max - min
+
+  if (span >= 40) return 10
+  if (span >= 20) return 5
+  if (span > 5) return 1
+  if (span > 1) return 0.5
+  return 0.1
 }
 
 function formatTrend(value: number): string {
@@ -234,6 +245,13 @@ function histogramBarColors(metric: DashboardMetric, length: number): string[] {
     const b = bigint & 255
     return `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`
   })
+}
+
+function buildHistogramTicks(metric: DashboardMetric): number[] {
+  const [min, max] = metric.range
+  const step = getHistogramStep(metric)
+  const tickCount = Math.max(1, Math.ceil((max - min) / step))
+  return Array.from({ length: tickCount + 1 }, (_, index) => Math.min(max, min + step * index))
 }
 
 function BrainCard({ metric }: { metric: DashboardMetric }) {
@@ -365,8 +383,8 @@ export default function DashboardPage() {
       const fallback = DASHBOARD_METRICS.find((item) => item.id === metric.id)
       return {
         ...metric,
-        accent: visual?.accent ?? fallback?.accent ?? '#7c3aed',
-        accentSoft: visual?.accentSoft ?? fallback?.accentSoft ?? '#ede9fe',
+        accent: visual?.accent ?? fallback?.accent ?? '#3B82F6',
+        accentSoft: visual?.accentSoft ?? fallback?.accentSoft ?? '#DBEAFE',
       }
     })
   }, [stats?.dashboard_metrics])
@@ -383,6 +401,7 @@ export default function DashboardPage() {
   }, [dashboardMetrics, selectedMetricId])
 
   const histogramData = useMemo(() => buildHistogram(selectedMetric), [selectedMetric])
+  const histogramTicks = useMemo(() => buildHistogramTicks(selectedMetric), [selectedMetric])
   const histogramColors = useMemo(
     () => histogramBarColors(selectedMetric, histogramData.length),
     [histogramData.length, selectedMetric]
@@ -564,17 +583,18 @@ export default function DashboardPage() {
 
               <div className='h-[12.5rem]'>
                 <ResponsiveContainer width='100%' height='100%'>
-                  <BarChart data={histogramData} margin={{ top: 12, right: 12, left: -12, bottom: 12 }}>
+                  <BarChart data={histogramData} margin={{ top: 12, right: 12, left: -12, bottom: 12 }} barCategoryGap={0} barGap={0}>
                     <CartesianGrid stroke='rgba(148,163,184,0.18)' vertical={false} />
                     <XAxis
-                      dataKey='label'
+                      type='number'
+                      dataKey='x'
+                      domain={selectedMetric.range}
+                      ticks={histogramTicks}
+                      tickFormatter={(value: number) => formatMetricValue(selectedMetric, value)}
                       tick={{ fill: '#64748b', fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
-                      interval={0}
-                      angle={-12}
-                      textAnchor='end'
-                      height={44}
+                      height={32}
                     />
                     <YAxis
                       allowDecimals={false}
@@ -598,9 +618,9 @@ export default function DashboardPage() {
                           : ''
                       }
                     />
-                    <Bar dataKey='count' radius={[14, 14, 6, 6]} animationDuration={500}>
+                    <Bar dataKey='count' radius={[0, 0, 0, 0]} animationDuration={500}>
                       {histogramData.map((entry, index) => (
-                        <Cell key={`${entry.label}-${index}`} fill={histogramColors[index]} />
+                        <Cell key={`${entry.x}-${index}`} fill={histogramColors[index]} />
                       ))}
                     </Bar>
                   </BarChart>

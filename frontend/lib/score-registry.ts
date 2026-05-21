@@ -35,7 +35,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [50, 150],
     unit: 'AgeAdj',
-    accentColor: '#2563eb',
+    accentColor: '#3B82F6',
   },
   {
     id: 'pmat',
@@ -49,7 +49,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [0, 24],
     unit: 'correct',
-    accentColor: '#3b82f6',
+    accentColor: '#8B5CF6',
   },
   {
     id: 'picseq',
@@ -64,7 +64,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [50, 150],
     unit: 'AgeAdj',
-    accentColor: '#0f766e',
+    accentColor: '#EC4899',
   },
   {
     id: 'sustained_attention',
@@ -79,7 +79,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [0, 1],
     unit: 'd-prime',
-    accentColor: '#8b5cf6',
+    accentColor: '#EC4899',
   },
   {
     id: 'emotsupp_unadj',
@@ -94,7 +94,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [0, 100],
     unit: '% correct',
-    accentColor: '#ef4444',
+    accentColor: '#EF4444',
   },
   {
     id: 'psqi',
@@ -109,7 +109,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [0, 21],
     unit: 'PSQI',
-    accentColor: '#10b981',
+    accentColor: '#F97316',
   },
 ]
 

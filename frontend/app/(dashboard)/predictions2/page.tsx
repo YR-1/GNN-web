@@ -133,11 +133,11 @@ function buildFocusedTimeSeries(
 }
 
 const METRIC_BAR_ACCENTS: Record<string, string> = {
-  listsort_ageadj: '#7c3aed',
-  pmat: '#a855f7',
-  picseq: '#0f766e',
-  emotsupp_unadj: '#ef4444',
-  psqi: '#f97316',
+  listsort_ageadj: '#3B82F6',
+  pmat: '#8B5CF6',
+  picseq: '#EC4899',
+  emotsupp_unadj: '#EF4444',
+  psqi: '#F97316',
 }
 
 const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']

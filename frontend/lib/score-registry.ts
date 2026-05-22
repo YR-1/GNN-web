@@ -30,12 +30,12 @@ function range(start: number, end: number): number[] {
 export const SCORE_REGISTRY: ScoreDefinition[] = [
   {
     id: 'listsort_ageadj',
-    name: 'ListSort (Sustained Attention)',
+    name: 'ListSort (Working Memory)',
     shortName: 'ListSort',
     category: 'cognition',
-    description: 'NIH Toolbox List Sorting score related to sustained attention and working memory.',
+    description: 'NIH Toolbox List Sorting working memory score.',
     domain: 'Cognition',
-    construct: 'Sustained attention',
+    construct: 'Working memory',
     variableCode: 'ListSort_AgeAdj',
     measureName: 'NIH Toolbox List Sorting Working Memory Test: Age-Adjusted Scale Score',
     detail:
@@ -113,7 +113,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
   },
   {
     id: 'emotsupp_unadj',
-    name: 'Emotional Support (Unadjusted)',
+    name: 'Emotional Support (Empathy & Care)',
     shortName: 'EmotSupp',
     category: 'emotion',
     description: 'NIH Toolbox Emotional Support Survey unadjusted T-score.',

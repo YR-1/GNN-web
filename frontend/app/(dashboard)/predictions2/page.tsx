@@ -7,10 +7,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
-import { getROILabel } from '@/lib/shen268-labels'
 import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
 import { simulateScore, type SimulatedScoreResult } from '@/lib/score-simulator'
-import type { AnalysisResponse, CorrelationResults, ExplainedScore, HistoryItem, TimeSeriesPayload } from '@/lib/types'
+import type { AnalysisResponse, CorrelationResults, HistoryItem } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
 
 const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix'), { ssr: false })
@@ -125,48 +124,6 @@ function scorePercent(value: number, scoreDef: ScoreDefinition): number {
   const [min, max] = scoreDef.scoreRange
   if (max <= min) return 0
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))
-}
-
-function getExplainedScore(results: CorrelationResults | undefined, scoreId: string): ExplainedScore | undefined {
-  return results?.explained_scores?.find((score) => toCanonicalScoreId(score.score_id) === scoreId)
-}
-
-function buildFocusedTimeSeries(
-  baseTimeSeries: TimeSeriesPayload | undefined,
-  results: CorrelationResults | undefined,
-  scoreId: string
-): TimeSeriesPayload | undefined {
-  if (!baseTimeSeries) return undefined
-
-  const explainedScore = getExplainedScore(results, scoreId)
-  const topRoiIndices = explainedScore?.roi_importance
-    ?.slice()
-    .sort((a, b) => b.importance - a.importance)
-    .slice(0, 5)
-    .map((roi) => roi.roi_index)
-
-  if (!topRoiIndices || topRoiIndices.length === 0) {
-    return baseTimeSeries
-  }
-
-  const roiSeries = topRoiIndices
-    .map((roiIndex) => {
-      const existing = baseTimeSeries.roi_series.find((series) => series.roi_index === roiIndex)
-      if (existing) {
-        return { ...existing, label: existing.label || getROILabel(existing.roi_index) }
-      }
-      return null
-    })
-    .filter((series): series is NonNullable<typeof series> => Boolean(series))
-
-  if (roiSeries.length === 0) {
-    return baseTimeSeries
-  }
-
-  return {
-    ...baseTimeSeries,
-    roi_series: roiSeries,
-  }
 }
 
 const METRIC_BAR_ACCENTS: Record<string, string> = {
@@ -352,10 +309,7 @@ export default function Predictions2Page() {
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
-  const focusedTimeSeries = useMemo(
-    () => buildFocusedTimeSeries(results?.time_series, results, selectedScore?.id ?? ''),
-    [results, selectedScore]
-  )
+  const focusedTimeSeries = results?.time_series
 
   const timeSeriesMaxIndex = Math.max((focusedTimeSeries?.tr_index.length ?? 1) - 1, 0)
 
@@ -606,7 +560,7 @@ export default function Predictions2Page() {
                 <div>
                   <h2 className='font-display text-lg font-semibold text-slate-950'>Time Series Graph</h2>
                   <p className='text-sm text-slate-700'>
-                    Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
+                    Global Signal = average across all ROIs; top 5 ROI traces by signal variability.
                   </p>
                 </div>
               </div>

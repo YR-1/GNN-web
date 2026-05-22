@@ -10,7 +10,7 @@ pinned: false
 
 # Project README
 
-## What This Project Doess
+## What This Project Doesss
 
 This project is a web app that lets users upload ROI time-series data (.txt) and view a correlation matrix with stats and history.
 

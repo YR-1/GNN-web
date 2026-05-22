@@ -67,6 +67,12 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
+function withAssetVersion(pathOrUrl?: string | null, version = 'static-brain-v2'): string | null {
+  if (!pathOrUrl) return null
+  const separator = pathOrUrl.includes('?') ? '&' : '?'
+  return `${pathOrUrl}${separator}v=${version}`
+}
+
 function formatValue(value: number, scoreDef: ScoreDefinition): string {
   const range = scoreDef.scoreRange[1] - scoreDef.scoreRange[0]
   if (range <= 1) return value.toFixed(2)
@@ -292,7 +298,7 @@ export default function Predictions2Page() {
       results?.importance_static_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_static_brain_url : null) ??
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
-    return toBackendUrl(path)
+    return withAssetVersion(toBackendUrl(path))
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
   const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
@@ -408,7 +414,7 @@ export default function Predictions2Page() {
                   )}
                 </div>
 
-                <section className='overflow-hidden'>
+                <section className='max-h-[15rem] overflow-hidden'>
                   <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
                     <StaticBrainViews
                       markersPngBase64={results.nilearn_markers_png_base64}

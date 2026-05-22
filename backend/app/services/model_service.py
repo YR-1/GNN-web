@@ -1367,16 +1367,16 @@ def _build_results_payload(
         "model_registry": model_registry.get("models"),
         "time_series": {
             "source": "uploaded_file",
-            "default_view": "global_plus_first_5_rois",
+            "default_view": "global_plus_top_5_variable_rois",
             "tr_index": list(range(int(n_timepoints))),
             "global_signal": _round_float_list(np.mean(ts, axis=1)),
             "roi_series": [
                 {
                     "roi_index": idx + 1,
-                    "label": _get_roi_label(idx + 1),
+                    "label": f"ROI {idx + 1}",
                     "values": _round_float_list(ts[:, idx]),
                 }
-                for idx in range(min(5, int(n_rois)))
+                for idx in np.argsort(np.nan_to_num(np.std(ts, axis=0), nan=0.0))[-min(5, int(n_rois)) :][::-1]
             ],
         },
         "pipeline": {

@@ -68,7 +68,7 @@ export function BoldTimeSeries({
           x: timeSeries.tr_index,
           y: roiSeries.values,
           mode: 'lines' as const,
-          name: roiSeries.label || `ROI ${roiSeries.roi_index}`,
+          name: `ROI ${roiSeries.roi_index}`,
           line: { width: 1.4 },
         })),
       ]
@@ -179,7 +179,7 @@ export function BoldTimeSeries({
 
   const downloadAsCSV = () => {
     if (!timeSeries) return
-    const header = ['TR Index', 'Global Signal', ...timeSeries.roi_series.map((series) => series.label || `ROI ${series.roi_index}`)]
+    const header = ['TR Index', 'Global Signal', ...timeSeries.roi_series.map((series) => `ROI ${series.roi_index}`)]
     const rows = timeSeries.tr_index.map((tr, index) => [
       tr,
       timeSeries.global_signal[index],

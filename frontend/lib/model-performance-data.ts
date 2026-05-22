@@ -53,7 +53,7 @@ export const modelPerformanceData: ModelPerformance[] = [
   },
   {
     id: 'emotsupp_unadj',
-    behavioralScore: 'Emotion Support',
+    behavioralScore: 'EmotSupp (Emotional Support)',
     correlation: 0.769,
     pValue: 0.00215,
     mse: 4.85,

@@ -44,7 +44,7 @@ MODEL_PERFORMANCE_SEEDS = [
     ("listsort_ageadj", "ListSort (Age Adjusted)", 0.882, 0.00041, 3.28, 1.2),
     ("pmat", "PMAT (Fluid Intelligence)", 0.844, 0.00073, 3.71, 2.4),
     ("picseq", "PicSeq (Picture Sequence Memory)", 0.806, 0.00124, 4.09, 3.1),
-    ("emotsupp_unadj", "Emotion Support", 0.769, 0.00215, 4.85, 5.4),
+    ("emotsupp_unadj", "EmotSupp (Emotional Support)", 0.769, 0.00215, 4.85, 5.4),
     ("psqi", "PSQI (Sleep Quality)", 0.747, 0.00301, 5.13, 6.2),
 ]
 

@@ -361,22 +361,20 @@ export default function Predictions2Page() {
   }
 
   return (
-    <div className='space-y-4'>
-      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
-        <div className='grid h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-3'>
-          <section className='px-1 py-0'>
-            <div className='space-y-0.5'>
-              <h1 className='font-display text-lg font-semibold text-slate-950'>Predicted Brain Behavior Dashboard</h1>
-              <p className='text-sm text-slate-700'>
-                File: <span className='mono-data'>{results.file_name}</span>
-              </p>
-            </div>
-          </section>
+    <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+      <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-2.5 sm:px-4.5'>
+        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>Predicted Brain Behavior Dashboard</h1>
+        <p className='mt-0.5 text-[12px] text-slate-600'>
+          File: <span className='mono-data'>{results.file_name}</span>
+        </p>
+      </header>
 
-          <section className='min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm'>
-            <div className='grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
+      <div className='space-y-2 bg-white px-3 pb-3 pt-1.5 sm:px-3.5 sm:pb-3.5 sm:pt-1.5'>
+      <section className='grid h-[calc(100vh-5.35rem)] grid-rows-[minmax(0,1fr)] gap-1 overflow-hidden'>
+          <section className='min-h-0 overflow-hidden'>
+            <div className='grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]'>
               <div className='grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1.55fr)_minmax(0,1.3fr)]'>
-                <div className='min-h-0 overflow-hidden rounded-[1.2rem] bg-white'>
+                <div className='min-h-0 overflow-hidden'>
                   {selectedImportanceBrainUrl ? (
                     <div className='relative h-full min-h-[15rem]'>
                       {isImportanceBrainLoading && (
@@ -411,7 +409,7 @@ export default function Predictions2Page() {
                   )}
                 </div>
 
-                <section className='overflow-hidden rounded-[1.2rem] bg-white'>
+                <section className='overflow-hidden'>
                   <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
                     <StaticBrainViews
                       markersPngBase64={results.nilearn_markers_png_base64}
@@ -422,11 +420,11 @@ export default function Predictions2Page() {
                   </div>
                 </section>
               </div>
-            <div className='flex min-h-0 flex-col rounded-[1.2rem] bg-white p-2.5'>
+            <div className='flex min-h-0 flex-col p-2.5'>
                 <div className='mb-2 flex items-start justify-between gap-3'>
                   <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
                   {selectedScoreResult && selectedScore ? (
-                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-white px-2.5 py-1.5 text-right shadow-sm'>
+                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-right shadow-sm'>
                       <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
                       <p className='text-sm font-semibold text-slate-950'>{selectedScore.shortName}</p>
                     </div>
@@ -518,10 +516,9 @@ export default function Predictions2Page() {
             </div>
             </div>
           </section>
-        </div>
       </section>
 
-      <section className='overflow-hidden rounded-[2rem] bg-slate-100/80'>
+      <section className='overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-slate-50/75'>
         <div className='p-3'>
           <section className='grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2'>
             <div className='flex h-full flex-col space-y-4'>
@@ -558,6 +555,7 @@ export default function Predictions2Page() {
           </section>
         </div>
       </section>
+      </div>
     </div>
   )
 }

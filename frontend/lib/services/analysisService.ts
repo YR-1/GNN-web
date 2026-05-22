@@ -125,6 +125,15 @@ export const analysisService = {
     }
   },
 
+  async backfillDashboardSummaries(): Promise<{ processed_executions: number; inserted_summary_rows: number }> {
+    try {
+      const response = await api.backfillDashboardSummaries()
+      return response.data as { processed_executions: number; inserted_summary_rows: number }
+    } catch (error) {
+      return handleServiceError(error)
+    }
+  },
+
   async retryAnalysis(executionId: string): Promise<AnalysisResponse> {
     try {
       const response = await api.retryAnalysis(executionId)

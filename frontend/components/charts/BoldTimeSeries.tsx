@@ -19,11 +19,16 @@ export function BoldTimeSeries({
 }: BoldTimeSeriesProps) {
   const plotRef = useRef<HTMLDivElement>(null)
   const plotlyRef = useRef<any>(null)
-  const downloadButtonStyle = {
-    backgroundColor: '#949bad',
-    borderColor: '#949bad',
-    color: '#ffffff',
-  } as const
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
   const getCurrentRanges = () => {
     const plotEl = plotRef.current as unknown as {
       _fullLayout?: {
@@ -168,13 +173,8 @@ export function BoldTimeSeries({
   const downloadAsJSON = () => {
     if (!timeSeries) return
     const dataString = JSON.stringify(timeSeries, null, 2)
-    const blob = new Blob([dataString], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `bold_time_series_${Date.now()}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const blob = new Blob([dataString], { type: 'application/json;charset=utf-8' })
+    downloadBlob(blob, `bold_time_series_${Date.now()}.json`)
   }
 
   const downloadAsCSV = () => {
@@ -185,14 +185,9 @@ export function BoldTimeSeries({
       timeSeries.global_signal[index],
       ...timeSeries.roi_series.map((series) => series.values[index]),
     ])
-    const csvContent = [header.join('\t'), ...rows.map((row) => row.join('\t'))].join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `bold_time_series_${Date.now()}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    const csvContent = [header.join(','), ...rows.map((row) => row.join(','))].join('\n')
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8' })
+    downloadBlob(blob, `bold_time_series_${Date.now()}.csv`)
   }
 
   if (!hasData) {
@@ -232,14 +227,24 @@ export function BoldTimeSeries({
           <button type='button' onClick={() => setDragMode('select')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Box Select</button>
           <button type='button' onClick={() => setDragMode('lasso')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Lasso</button>
           <button type='button' onClick={resetView} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Home / Reset</button>
-          <button type='button' onClick={downloadAsPNG} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>PNG</button>
         </div>
         <div className='mt-4 flex gap-2'>
           <button
             type='button'
+            onClick={downloadAsPNG}
+            className='btn-download-action'
+          >
+            <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
+              <path d='M12 4v9' strokeLinecap='round' />
+              <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
+              <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
+            </svg>
+            <span>PNG</span>
+          </button>
+          <button
+            type='button'
             onClick={downloadAsJSON}
-            className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
-            style={downloadButtonStyle}
+            className='btn-download-action'
           >
             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
               <path d='M12 4v9' strokeLinecap='round' />
@@ -251,8 +256,7 @@ export function BoldTimeSeries({
           <button
             type='button'
             onClick={downloadAsCSV}
-            className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
-            style={downloadButtonStyle}
+            className='btn-download-action'
           >
             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
               <path d='M12 4v9' strokeLinecap='round' />

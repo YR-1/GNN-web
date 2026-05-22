@@ -511,7 +511,7 @@ export default function Predictions2Page() {
             <div className='flex h-full flex-col space-y-4'>
               <div>
                 <div>
-                  <h2 className='font-display text-lg font-semibold text-slate-950'>Correlation Matrix</h2>
+                  <h2 className='font-display text-[1.4rem] font-semibold text-slate-950'>Correlation Matrix</h2>
                   <p className='text-sm text-slate-700'>268 x 268 Shen ROI correlation matrix heatmap computed from the uploaded fMRI time series.</p>
                 </div>
               </div>
@@ -526,7 +526,7 @@ export default function Predictions2Page() {
             <div className='flex h-full flex-col space-y-4'>
               <div>
                 <div>
-                  <h2 className='font-display text-lg font-semibold text-slate-950'>Time Series Graph</h2>
+                  <h2 className='font-display text-[1.4rem] font-semibold text-slate-950'>Time Series Graph</h2>
                   <p className='text-sm text-slate-700'>
                     Global Signal = average across all ROIs; top 5 ROI traces by signal variability.
                   </p>
@@ -546,3 +546,4 @@ export default function Predictions2Page() {
     </div>
   )
 }
+

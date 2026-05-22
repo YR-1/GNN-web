@@ -15,7 +15,6 @@ import {
 } from 'recharts'
 import {
   Activity,
-  ArrowUpRight,
   CalendarRange,
   ShieldCheck,
   Users,
@@ -30,6 +29,8 @@ type DashboardMetric = {
   shortLabel: string
   range: [number, number]
   average: number
+  summaryStd?: number
+  summaryVariance?: number
   trend: number
   accent: string
   accentSoft: string
@@ -54,7 +55,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     label: 'ListSort (Age Adjusted)',
     shortLabel: 'ListSort',
     range: [50, 150],
-    average: 96,
+    average: 108,
+    summaryStd: 4.63,
+    summaryVariance: 21.4,
     trend: 2.4,
     accent: '#3B82F6',
     accentSoft: '#DBEAFE',
@@ -76,7 +79,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     label: 'PMAT (Fluid Intelligence)',
     shortLabel: 'PMAT',
     range: [0, 24],
-    average: 16.1,
+    average: 16.8,
+    summaryStd: 1.53,
+    summaryVariance: 2.35,
     trend: 3.1,
     accent: '#8B5CF6',
     accentSoft: '#EDE9FE',
@@ -98,7 +103,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     label: 'PicSeq (Picture Sequence Memory)',
     shortLabel: 'PicSeq',
     range: [50, 150],
-    average: 102,
+    average: 112,
+    summaryStd: 1.6,
+    summaryVariance: 2.55,
     trend: 1.9,
     accent: '#EC4899',
     accentSoft: '#FCE7F3',
@@ -120,7 +127,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     label: 'EmotSupp (Emotional Support)',
     shortLabel: 'EmotSupp',
     range: [0, 100],
-    average: 77,
+    average: 54,
+    summaryStd: 0.38,
+    summaryVariance: 0.14,
     trend: 4.2,
     accent: '#ef4444',
     accentSoft: '#fee2e2',
@@ -142,7 +151,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
     label: 'PSQI (Sleep Quality)',
     shortLabel: 'PSQI',
     range: [0, 21],
-    average: 13.1,
+    average: 4.1,
+    summaryStd: 0.1,
+    summaryVariance: 0.01,
     trend: -2.7,
     accent: '#F97316',
     accentSoft: '#FFEDD5',
@@ -220,9 +231,17 @@ function getHistogramStep(metric: DashboardMetric): number {
   return 0.1
 }
 
-function formatTrend(value: number): string {
-  const sign = value >= 0 ? '+' : ''
-  return `${sign}${value.toFixed(1)}%`
+function standardDeviation(values: number[]): number {
+  if (values.length <= 1) return 0
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1)
+  return Math.sqrt(Math.max(variance, 0))
+}
+
+function formatSummarySpread(metric: DashboardMetric, value: number): string {
+  const [min, max] = metric.range
+  if (max - min <= 25 || Math.abs(value) < 10) return value.toFixed(2)
+  return value.toFixed(1)
 }
 
 function formatBoxMetric(metric: DashboardMetric) {
@@ -258,7 +277,7 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
   const topRegions = metric.topRegions.slice(0, 3)
 
   return (
-    <div className='relative h-full overflow-hidden rounded-[1.65rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
+    <div className='relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.65rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
       <div
         className='pointer-events-none absolute inset-x-10 top-5 h-24 rounded-full blur-3xl'
         style={{ background: `radial-gradient(circle, ${metric.accentSoft}, transparent 72%)` }}
@@ -269,10 +288,10 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
         </div>
       </div>
 
-      <div className='mt-2 space-y-1'>
+      <div className='relative mt-2 flex min-h-0 flex-1 flex-col justify-evenly gap-2'>
         {topRegions.length > 0 ? (
           topRegions.map((region, index) => (
-            <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-2.5 py-1.5 shadow-sm'>
+            <div key={region.name} className='flex min-h-[3rem] items-center rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-2.5 py-1.5 shadow-sm'>
               <div className='flex items-center justify-between gap-3'>
                 <div className='flex items-center gap-3'>
                   <span
@@ -287,7 +306,7 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
             </div>
           ))
         ) : (
-          <div className='rounded-[0.95rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-center text-[12px] text-slate-500'>
+          <div className='flex min-h-0 flex-1 items-center justify-center rounded-[0.95rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-center text-[12px] text-slate-500'>
             No participant-level brain-region explanation is available for this metric yet.
           </div>
         )}
@@ -505,16 +524,18 @@ export default function DashboardPage() {
             Group Brain Behavior Prediction Dashboard
         </h1>
         <p className='mt-0.5 text-[12px] text-slate-600'>
-          Cohort-wide fMRI-derived behavioral prediction monitoring.
+          Group-level behavioral prediction analysis from functional brain connectivity patterns.
         </p>
       </header>
 
       <section className='bg-white p-4 sm:p-4.5'>
         <div className='space-y-2.5'>
-          <div className='grid gap-2 xl:grid-cols-[minmax(0,1fr)_10rem] xl:items-start'>
+          <div className='grid gap-2 xl:grid-cols-[minmax(0,1fr)_10rem] xl:items-stretch'>
             <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
               {dashboardMetrics.map((metric) => {
                 const active = metric.id === selectedMetric.id
+                const std = metric.summaryStd ?? standardDeviation(metric.distribution)
+                const variance = metric.summaryVariance ?? std * std
                 return (
                   <button
                     key={metric.id}
@@ -542,26 +563,31 @@ export default function DashboardPage() {
                           : `radial-gradient(circle at top left, ${metric.accentSoft}, transparent 60%)`,
                       }}
                     />
-                    <div className='relative flex items-start justify-between gap-2.5'>
+                    <div className='relative'>
                       <div>
                         <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${active ? 'text-slate-700' : 'text-slate-500'}`}>
                           {metric.label}
                         </p>
-                        <p className='mt-0.5 text-[1.2rem] font-semibold leading-none' style={{ color: metric.accent }}>
-                          {formatMetricValue(metric, metric.average)}
-                        </p>
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                          active ? 'bg-white/70 text-slate-700' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <ArrowUpRight className={`h-3 w-3 ${metric.trend < 0 ? 'rotate-90' : ''}`} />
-                        {formatTrend(metric.trend)}
-                      </span>
-                    </div>
+                      <div className='mt-2 grid grid-cols-[minmax(0,1fr)_4rem] gap-3'>
+                        <div>
+                          <p className='text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500'>AVG ± SD</p>
+                          <p className='mt-0.5 text-[1.2rem] font-semibold leading-none' style={{ color: metric.accent }}>
+                            {formatMetricValue(metric, metric.average)} ± {formatSummarySpread(metric, std)}
+                          </p>
+                        </div>
+                        <div className='text-right'>
+                          <p className='text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500'>VAR</p>
+                          <p className='mt-0.5 text-[1.2rem] font-semibold leading-none text-slate-900'>
+                            {formatSummarySpread(metric, variance)}
+                          </p>
+                        </div>
+                      </div>
+
                     <div className='relative mt-1.5 flex items-center justify-between'>
-                      <p className={`text-[10px] ${active ? 'text-slate-600' : 'text-slate-500'}`}>Avg prediction</p>
+                      <p className={`text-[10px] ${active ? 'text-slate-600' : 'text-slate-500'}`}>
+                        Avg prediction ({formatMetricValue(metric, metric.range[0])} to {formatMetricValue(metric, metric.range[1])})
+                      </p>
                       <span
                         className='inline-flex h-2 w-2 rounded-full shadow-[0_0_16px_currentColor]'
                         style={{ color: metric.accent, backgroundColor: metric.accent }}
@@ -576,18 +602,20 @@ export default function DashboardPage() {
                         }}
                       />
                     </div>
+                    </div>
                   </button>
                 )
               })}
             </div>
 
-            <div className='grid shrink-0 gap-2'>
-              <div className='rounded-[1rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
-                <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Cohort Size</p>
-                <div className='mt-1 flex items-end justify-between gap-3'>
-                  <p className='text-[1.2rem] font-semibold text-slate-950'>{cohortSize}</p>
-                  <Users className='h-4 w-4 text-violet-500' />
+            <div className='grid gap-2'>
+              <div className='flex h-full flex-col rounded-[1rem] border border-slate-200/80 bg-slate-50/75 px-2.5 py-2 shadow-sm'>
+                <p className='text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Total Subjects</p>
+                <div className='mt-4 flex items-end justify-between gap-3'>
+                  <p className='text-[1.8rem] font-semibold leading-none text-slate-950'>{cohortSize}</p>
+                  <Users className='h-8 w-8 text-violet-500' />
                 </div>
+                <p className='mt-auto pt-5 text-[11px] text-slate-500'>Uploaded subjects</p>
               </div>
             </div>
           </div>
@@ -599,7 +627,7 @@ export default function DashboardPage() {
                   <h2 className='text-base font-semibold text-slate-950'>{selectedMetric.label} Distribution</h2>
                 </div>
                 <div className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600'>
-                  Percentile-aware cohort histogram
+                  Group Prediction Distribution
                 </div>
               </div>
 
@@ -661,10 +689,10 @@ export default function DashboardPage() {
     
               </div>
               <div className='flex flex-wrap gap-2 text-[11px] font-medium text-slate-600'>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>variance analysis</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>cohort comparison</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>prediction spread</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>percentile distribution</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Comparison</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Spread</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Distribution</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Percentiles</span>
               </div>
             </div>
 

@@ -22,11 +22,18 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     }
 
     const previousOverflow = document.body.style.overflow
+    const previousPaddingRight = document.body.style.paddingRight
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`
+    }
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKeyDown)
 
     return () => {
       document.body.style.overflow = previousOverflow
+      document.body.style.paddingRight = previousPaddingRight
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [open, onOpenChange])
@@ -41,7 +48,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       onClick={() => onOpenChange(false)}
     >
       <div className='absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]' aria-hidden='true' />
-      <div className='relative z-10 w-full max-h-[90vh] overflow-y-auto' onClick={(event) => event.stopPropagation()}>
+      <div className='relative z-10 flex w-full justify-center pointer-events-none'>
         {children}
       </div>
     </div>,
@@ -52,7 +59,8 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 export function DialogContent({ className = '', ...props }: DivProps) {
   return (
     <div
-      className={`mx-auto w-full rounded-2xl border border-brand-400/25 bg-white/95 p-5 shadow-xl sm:p-6 ${className}`}
+      className={`pointer-events-auto mx-auto w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-brand-400/25 bg-white/95 p-5 shadow-xl sm:p-6 ${className}`}
+      onClick={(event) => event.stopPropagation()}
       {...props}
     />
   )

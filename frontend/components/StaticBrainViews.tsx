@@ -24,29 +24,29 @@ export default function StaticBrainViews({
 
   if (shouldShowImportanceBrain && staticBrainUrl) {
     return (
-      <div className='surface-card flex h-full min-h-0 w-full flex-col p-0'>
+      <div className='surface-card flex h-full min-h-[18rem] w-full flex-col overflow-hidden rounded-[1.2rem] border border-slate-200/70 bg-white p-0'>
         <div className='flex h-full min-h-0 w-full flex-1 overflow-hidden bg-white p-0'>
           <div className='relative flex h-full min-h-0 w-full flex-1 overflow-hidden'>
-            <div className='flex min-h-0 flex-1 overflow-hidden pb-0'>
+            <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden px-2 pb-7 pt-2'>
               <img
                 src={staticBrainUrl}
                 alt={`4-panel anatomical ${scoreShortName} model importance brain`}
-                className='h-full w-full object-contain'
+                className='max-h-full w-full object-contain'
                 loading='lazy'
                 decoding='async'
               />
             </div>
             <div className='pointer-events-none absolute inset-0'>
-              <p className='absolute text-[10px] text-ink-700' style={{ left: '12%', bottom: '12px' }}>
+              <p className='absolute text-[10px] text-ink-700' style={{ left: '12%', bottom: '10px' }}>
                 Left Sagittal
               </p>
-              <p className='absolute text-[10px] text-ink-700' style={{ left: '34%', bottom: '12px' }}>
+              <p className='absolute text-[10px] text-ink-700' style={{ left: '34%', bottom: '10px' }}>
                 Coronal
               </p>
-              <p className='absolute text-[10px] text-ink-700' style={{ left: '54%', bottom: '12px' }}>
+              <p className='absolute text-[10px] text-ink-700' style={{ left: '54%', bottom: '10px' }}>
                 Right Sagittal
               </p>
-              <p className='absolute text-[10px] text-ink-700' style={{ left: '76%', bottom: '12px' }}>
+              <p className='absolute text-[10px] text-ink-700' style={{ left: '76%', bottom: '10px' }}>
                 Axial
               </p>
             </div>

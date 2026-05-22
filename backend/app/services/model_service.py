@@ -402,15 +402,15 @@ DEFAULT_XAI_TOP_K_EDGES = 10
 DEFAULT_XAI_TOP_K_WINDOWS = 3
 DEFAULT_XAI_MAX_WINDOWS = 3
 LISTSORT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/listsort_importance_3d.html"
-LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.png"
+LISTSORT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/listsort_importance_4panel.jpeg"
 PMAT_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/pmat_importance_3d.html"
-PMAT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/pmat_importance_4panel.png"
+PMAT_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/pmat_importance_4panel.jpeg"
 PICSEQ_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/picseq_importance_3d.html"
-PICSEQ_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/picseq_importance_4panel.png"
+PICSEQ_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/picseq_importance_4panel.jpeg"
 EMOTSUPP_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/emotsupp_importance_3d.html"
-EMOTSUPP_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/emotsupp_importance_4panel.png"
+EMOTSUPP_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/emotsupp_importance_4panel.jpeg"
 PSQI_IMPORTANCE_BRAIN_STATIC_URL = "/static/brain_plots/psqi_importance_3d.html"
-PSQI_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/psqi_importance_4panel.png"
+PSQI_IMPORTANCE_STATIC_BRAIN_URL = "/static/brain_plots/psqi_importance_4panel.jpeg"
 LISTSORT_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
@@ -421,7 +421,7 @@ LISTSORT_IMPORTANCE_STATIC_BRAIN_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brain_plots"
-    / "listsort_importance_4panel.png"
+    / "listsort_importance_4panel.jpeg"
 )
 PMAT_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
@@ -433,7 +433,7 @@ PMAT_IMPORTANCE_STATIC_BRAIN_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brain_plots"
-    / "pmat_importance_4panel.png"
+    / "pmat_importance_4panel.jpeg"
 )
 PICSEQ_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
@@ -445,7 +445,7 @@ PICSEQ_IMPORTANCE_STATIC_BRAIN_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brain_plots"
-    / "picseq_importance_4panel.png"
+    / "picseq_importance_4panel.jpeg"
 )
 EMOTSUPP_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
@@ -457,7 +457,7 @@ EMOTSUPP_IMPORTANCE_STATIC_BRAIN_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brain_plots"
-    / "emotsupp_importance_4panel.png"
+    / "emotsupp_importance_4panel.jpeg"
 )
 PSQI_IMPORTANCE_BRAIN_HTML_PATH = (
     Path(__file__).resolve().parents[2]
@@ -469,7 +469,7 @@ PSQI_IMPORTANCE_STATIC_BRAIN_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brain_plots"
-    / "psqi_importance_4panel.png"
+    / "psqi_importance_4panel.jpeg"
 )
 SCORE_IMPORTANCE_PLOTS = {
     "listsort_ageadj": {

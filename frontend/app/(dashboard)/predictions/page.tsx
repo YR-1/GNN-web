@@ -67,6 +67,11 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
+function toJpegStaticBrainPath(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null
+  return pathOrUrl.replace(/\.png$/i, '.jpeg')
+}
+
 function formatValue(value: number, scoreDef: ScoreDefinition): string {
   const range = scoreDef.scoreRange[1] - scoreDef.scoreRange[0]
   if (range <= 1) return value.toFixed(2)
@@ -288,10 +293,11 @@ export default function Predictions2Page() {
   }, [results?.importance_brain_urls, results?.listsort_importance_brain_url, selectedScore])
   const selectedImportanceStaticBrainUrl = useMemo(() => {
     if (!selectedScore) return null
-    const path =
+    const path = toJpegStaticBrainPath(
       results?.importance_static_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_static_brain_url : null) ??
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
+    )
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
   const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))

@@ -15,7 +15,6 @@ import {
 } from 'recharts'
 import {
   Activity,
-  ArrowUpRight,
   CalendarRange,
   ShieldCheck,
   Users,
@@ -176,6 +175,23 @@ function formatMetricValue(metric: DashboardMetric, value: number): string {
   return Math.round(value).toString()
 }
 
+function computeVariance(values: number[]): number {
+  if (values.length === 0) return 0
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+  const squaredDiffSum = values.reduce((sum, value) => sum + (value - mean) ** 2, 0)
+  return squaredDiffSum / values.length
+}
+
+function computeStandardDeviation(values: number[]): number {
+  return Math.sqrt(computeVariance(values))
+}
+
+function formatSpreadValue(value: number): string {
+  if (value >= 100) return Math.round(value).toString()
+  if (value >= 10) return value.toFixed(1)
+  return value.toFixed(2)
+}
+
 function quantile(values: number[], percentile: number): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -218,11 +234,6 @@ function getHistogramStep(metric: DashboardMetric): number {
   if (span > 5) return 1
   if (span > 1) return 0.5
   return 0.1
-}
-
-function formatTrend(value: number): string {
-  const sign = value >= 0 ? '+' : ''
-  return `${sign}${value.toFixed(1)}%`
 }
 
 function formatBoxMetric(metric: DashboardMetric) {
@@ -269,19 +280,19 @@ function BrainCard({ metric }: { metric: DashboardMetric }) {
         </div>
       </div>
 
-      <div className='mt-2 space-y-1'>
+      <div className='mt-2.5 space-y-2'>
         {topRegions.length > 0 ? (
           topRegions.map((region, index) => (
-            <div key={region.name} className='rounded-[0.95rem] border border-slate-200/80 bg-white/80 px-2.5 py-1.5 shadow-sm'>
+            <div key={region.name} className='rounded-[1rem] border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm'>
               <div className='flex items-center justify-between gap-3'>
                 <div className='flex items-center gap-3'>
                   <span
-                    className='inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm'
+                    className='inline-flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold text-white shadow-sm'
                     style={{ background: metric.accent }}
                   >
                     {index + 1}
                   </span>
-                  <span className='text-[12px] font-medium text-slate-900'>{region.name}</span>
+                  <span className='text-[14px] font-semibold text-slate-900'>{region.name}</span>
                 </div>
               </div>
             </div>
@@ -505,16 +516,18 @@ export default function DashboardPage() {
             Group Brain Behavior Prediction Dashboard
         </h1>
         <p className='mt-0.5 text-[12px] text-slate-600'>
-          Cohort-wide fMRI-derived behavioral prediction monitoring.
+          Group-level behavioral prediction analysis from functional brain connectivity patterns.
         </p>
       </header>
 
       <section className='bg-white p-4 sm:p-4.5'>
         <div className='space-y-2.5'>
-          <div className='grid gap-2 xl:grid-cols-[minmax(0,1fr)_10rem] xl:items-start'>
+          <div className='grid gap-2 xl:grid-cols-[minmax(0,1fr)_10rem] xl:items-stretch'>
             <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
               {dashboardMetrics.map((metric) => {
                 const active = metric.id === selectedMetric.id
+                const variance = computeVariance(metric.distribution)
+                const standardDeviation = computeStandardDeviation(metric.distribution)
                 return (
                   <button
                     key={metric.id}
@@ -547,21 +560,32 @@ export default function DashboardPage() {
                         <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${active ? 'text-slate-700' : 'text-slate-500'}`}>
                           {metric.label}
                         </p>
-                        <p className='mt-0.5 text-[1.2rem] font-semibold leading-none' style={{ color: metric.accent }}>
-                          {formatMetricValue(metric, metric.average)}
-                        </p>
+                        <div className='mt-2 grid grid-cols-2 gap-4 tabular-nums'>
+                          <div>
+                            <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${active ? 'text-slate-600' : 'text-slate-500'}`}>
+                              AVG ± SD
+                            </p>
+                            <p className='mt-0.5 text-[1.1rem] font-semibold leading-none text-slate-900'>
+                              <span style={{ color: metric.accent }}>{formatMetricValue(metric, metric.average)}</span>
+                              {' '}
+                              <span>± {formatSpreadValue(standardDeviation)}</span>
+                            </p>
+                          </div>
+                          <div className='min-w-0 text-left'>
+                            <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${active ? 'text-slate-600' : 'text-slate-500'}`}>
+                              VAR
+                            </p>
+                            <p className='mt-0.5 text-[1rem] font-semibold leading-none text-slate-800 tabular-nums'>
+                              {formatSpreadValue(variance)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                          active ? 'bg-white/70 text-slate-700' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <ArrowUpRight className={`h-3 w-3 ${metric.trend < 0 ? 'rotate-90' : ''}`} />
-                        {formatTrend(metric.trend)}
-                      </span>
                     </div>
                     <div className='relative mt-1.5 flex items-center justify-between'>
-                      <p className={`text-[10px] ${active ? 'text-slate-600' : 'text-slate-500'}`}>Avg prediction</p>
+                      <p className={`text-[10px] ${active ? 'text-slate-600' : 'text-slate-500'}`}>
+                        Avg prediction ({formatMetricValue(metric, metric.range[0])} to {formatMetricValue(metric, metric.range[1])})
+                      </p>
                       <span
                         className='inline-flex h-2 w-2 rounded-full shadow-[0_0_16px_currentColor]'
                         style={{ color: metric.accent, backgroundColor: metric.accent }}
@@ -581,15 +605,16 @@ export default function DashboardPage() {
               })}
             </div>
 
-            <div className='grid shrink-0 gap-2'>
-              <div className='rounded-[1rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
-                <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Cohort Size</p>
-                <div className='mt-1 flex items-end justify-between gap-3'>
-                  <p className='text-[1.2rem] font-semibold text-slate-950'>{cohortSize}</p>
-                  <Users className='h-4 w-4 text-violet-500' />
+              <div className='grid shrink-0 gap-2'>
+                <div className='flex h-full flex-col justify-between rounded-[1rem] border border-slate-200/80 bg-slate-50/75 p-2 shadow-sm'>
+                  <p className='text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500'>Total Subjects</p>
+                  <div className='mt-1 flex items-end justify-between gap-3'>
+                    <p className='text-[2rem] font-semibold text-slate-950'>{cohortSize}</p>
+                    <Users className='h-9 w-9 text-violet-500' />
+                  </div>
+                  <p className='text-[10px] text-slate-500'>Uploaded subjects</p>
                 </div>
               </div>
-            </div>
           </div>
 
           <div className='grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] xl:auto-rows-fr'>
@@ -599,7 +624,7 @@ export default function DashboardPage() {
                   <h2 className='text-base font-semibold text-slate-950'>{selectedMetric.label} Distribution</h2>
                 </div>
                 <div className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600'>
-                  Percentile-aware cohort histogram
+                  Prediction Distribution
                 </div>
               </div>
 
@@ -657,14 +682,14 @@ export default function DashboardPage() {
           <section className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-3 shadow-sm'>
             <div className='mb-2.5 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between'>
               <div>
-                <h2 className='text-base font-semibold text-slate-950'>Longitudinal Distribution Metrics</h2>
+                <h2 className='text-base font-semibold text-slate-950'>Prediction Spread Analysis</h2>
     
               </div>
               <div className='flex flex-wrap gap-2 text-[11px] font-medium text-slate-600'>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>variance analysis</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>cohort comparison</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>prediction spread</span>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>percentile distribution</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Comparison</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Spread</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Distribution</span>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1'>Percentiles</span>
               </div>
             </div>
 

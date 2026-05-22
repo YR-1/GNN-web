@@ -30,11 +30,11 @@ const FALLBACK_IMPORTANCE_BRAIN_PATHS: Record<string, string> = {
   psqi: '/static/brain_plots/psqi_importance_3d.html',
 }
 const FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS: Record<string, string> = {
-  listsort_ageadj: '/static/brain_plots/listsort_importance_4panel.png',
-  pmat: '/static/brain_plots/pmat_importance_4panel.png',
-  picseq: '/static/brain_plots/picseq_importance_4panel.png',
-  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.png',
-  psqi: '/static/brain_plots/psqi_importance_4panel.png',
+  listsort_ageadj: '/static/brain_plots/listsort_importance_4panel.jpeg',
+  pmat: '/static/brain_plots/pmat_importance_4panel.jpeg',
+  picseq: '/static/brain_plots/picseq_importance_4panel.jpeg',
+  emotsupp_unadj: '/static/brain_plots/emotsupp_importance_4panel.jpeg',
+  psqi: '/static/brain_plots/psqi_importance_4panel.jpeg',
 }
 
 interface PredictionReportProps {
@@ -71,6 +71,11 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   if (!pathOrUrl) return null
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
+}
+
+function toJpegStaticBrainPath(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null
+  return pathOrUrl.replace(/\.png$/i, '.jpeg')
 }
 
 export function PredictionReport({
@@ -164,10 +169,11 @@ export function PredictionReport({
 
   const selectedImportanceStaticBrainUrl = useMemo(() => {
     if (!selectedScore) return null
-    const path =
+    const path = toJpegStaticBrainPath(
       results?.importance_static_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === 'listsort_ageadj' ? results?.listsort_importance_static_brain_url : null) ??
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
+    )
     return toBackendUrl(path)
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
 

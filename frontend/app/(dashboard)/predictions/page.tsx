@@ -290,7 +290,7 @@ export default function Predictions2Page() {
       results?.importance_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_brain_url : null) ??
       FALLBACK_IMPORTANCE_BRAIN_PATHS[selectedScore.id]
-    return toBackendUrl(path)
+    return withAssetVersion(toBackendUrl(path), 'interactive-brain-v4')
   }, [results?.importance_brain_urls, results?.listsort_importance_brain_url, selectedScore])
   const selectedImportanceStaticBrainUrl = useMemo(() => {
     if (!selectedScore) return null
@@ -425,37 +425,37 @@ export default function Predictions2Page() {
                   </div>
                 </section>
               </div>
-            <div className='flex min-h-0 flex-col p-2.5'>
-                <div className='mb-2 flex items-start justify-between gap-3'>
-                  <h2 className='font-display text-base font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
+            <div className='flex min-h-0 flex-col px-3 pb-3 pt-0'>
+                <div className='mb-1.5 flex items-center justify-between gap-3'>
+                  <h2 className='font-display text-[1.4rem] font-semibold text-slate-950'>Cognitive & Emotion Metrics</h2>
                   {selectedScoreResult && selectedScore ? (
-                    <div className='ml-auto rounded-[0.9rem] border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-right shadow-sm'>
-                      <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
-                      <p className='text-sm font-semibold text-slate-950'>{selectedScore.shortName}</p>
+                    <div className='ml-auto rounded-[1rem] border border-slate-200 bg-slate-50/80 px-3 py-2 text-right shadow-sm'>
+                      <p className='text-[11px] uppercase tracking-[0.12em] text-slate-500'>Predicted Score</p>
+                      <p className='text-[1.02rem] font-semibold text-slate-950'>{selectedScore.shortName}</p>
                     </div>
                   ) : null}
                 </div>
 
-                <div className='flex-1 space-y-2.5'>
+                <div className='flex-1 space-y-2'>
                   {[
                     { id: 'cognition', label: 'Cognition Metrics', scores: cognitionMetricScores },
                     { id: 'emotion', label: 'Emotion Metrics', scores: emotionMetricScores },
                   ].map((group) => (
-                    <div key={group.id} className={group.id === 'emotion' ? 'space-y-1.5 pt-2' : 'space-y-1.5'}>
+                    <div key={group.id} className={group.id === 'emotion' ? 'space-y-2 pt-1' : 'space-y-2'}>
                       <div className='px-1'>
                         <div className='flex items-center gap-2'>
                           {group.id === 'cognition' ? (
-                            <Brain className='h-4 w-4 text-slate-700' />
+                            <Brain className='h-5 w-5 text-slate-700' />
                           ) : (
-                            <Heart className='h-4 w-4 text-slate-700' />
+                            <Heart className='h-5 w-5 text-slate-700' />
                           )}
-                          <p className='font-display text-base font-semibold text-slate-950'>
+                          <p className='font-display text-[1.08rem] font-semibold text-slate-950'>
                             {group.label}
                           </p>
                         </div>
                       </div>
 
-                      <div className='space-y-2'>
+                      <div className='space-y-2.5'>
                         {group.scores.map((score) => {
                           const result = predictedValues[score.id]
                           const percent = result ? scorePercent(result.value, score) : 0
@@ -466,36 +466,36 @@ export default function Predictions2Page() {
                               key={score.id}
                               type='button'
                               onClick={() => setSelectedScoreId(score.id)}
-                              className={`w-full rounded-[0.95rem] border px-3 py-2 text-left transition ${
+                              className={`w-full rounded-[1rem] border px-3.5 py-2.5 text-left transition ${
                                 selectedScore?.id === score.id
                                   ? 'border-slate-300 bg-slate-100 shadow-sm'
                                   : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                               }`}
                             >
-                              <div className='mb-1 flex items-start justify-between gap-3'>
+                              <div className='mb-1.5 flex items-start justify-between gap-3'>
                                 <div className='min-w-0'>
-                                  <div className='flex items-center gap-1.5'>
-                                    <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
+                                  <div className='flex items-center gap-2'>
+                                    <p className='font-display truncate text-[14px] font-bold text-slate-900'>{score.name}</p>
                                     <span
-                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
+                                      className='inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
                                       title={score.description}
                                       aria-label={`${score.name} info`}
                                     >
-                                      <Info className='h-2.5 w-2.5' />
+                                      <Info className='h-3 w-3' />
                                     </span>
                                   </div>
-                                  <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
+                                  <div className='mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px]'>
                                     <p className='text-slate-500'>{score.unit}</p>
                                     <p className='text-slate-400'>{formatRangeLabel(score)}</p>
                                   </div>
                                 </div>
-                                <div className='shrink-0 pl-2 pt-0.5 text-right'>
-                                  <p className='text-base font-semibold' style={{ color: accent }}>
+                                <div className='shrink-0 pl-3 pt-0.5 text-right'>
+                                  <p className='text-[1.18rem] font-semibold' style={{ color: accent }}>
                                     {result ? formatPredictionValue(result.value, score, result.valueScale) : '--'}
                                   </p>
                                 </div>
                               </div>
-                              <div className='h-1.5 overflow-hidden rounded-full bg-slate-100'>
+                              <div className='h-2 overflow-hidden rounded-full bg-slate-100'>
                                 <div
                                   className='h-full rounded-full transition-all'
                                   style={{

@@ -6,6 +6,7 @@ export interface ScatterPoint {
 export interface ModelPerformance {
   id: string
   behavioralScore: string
+  gnnArchitecture: string
   correlation: number
   pValue: number
   mse: number
@@ -29,7 +30,8 @@ const generateScatterData = (seed: number, correlation: number): ScatterPoint[] 
 export const modelPerformanceData: ModelPerformance[] = [
   {
     id: 'listsort_ageadj',
-    behavioralScore: 'ListSort (Age Adjusted)',
+    behavioralScore: 'ListSort (Working Memory)',
+    gnnArchitecture: 'FBNetGen',
     correlation: 0.882,
     pValue: 0.00041,
     mse: 3.28,
@@ -38,6 +40,7 @@ export const modelPerformanceData: ModelPerformance[] = [
   {
     id: 'pmat',
     behavioralScore: 'PMAT (Fluid Intelligence)',
+    gnnArchitecture: 'GAT',
     correlation: 0.844,
     pValue: 0.00073,
     mse: 3.71,
@@ -46,6 +49,7 @@ export const modelPerformanceData: ModelPerformance[] = [
   {
     id: 'picseq',
     behavioralScore: 'PicSeq (Picture Sequence Memory)',
+    gnnArchitecture: 'FBNetGen',
     correlation: 0.806,
     pValue: 0.00124,
     mse: 4.09,
@@ -53,7 +57,8 @@ export const modelPerformanceData: ModelPerformance[] = [
   },
   {
     id: 'emotsupp_unadj',
-    behavioralScore: 'EmotSupp (Emotional Support)',
+    behavioralScore: 'Emotional Support (Empathy & Caring)',
+    gnnArchitecture: 'BrainGNN',
     correlation: 0.769,
     pValue: 0.00215,
     mse: 4.85,
@@ -62,6 +67,7 @@ export const modelPerformanceData: ModelPerformance[] = [
   {
     id: 'psqi',
     behavioralScore: 'PSQI (Sleep Quality)',
+    gnnArchitecture: 'BrainGNN',
     correlation: 0.747,
     pValue: 0.00301,
     mse: 5.13,

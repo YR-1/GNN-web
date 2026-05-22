@@ -577,6 +577,87 @@
     border: 1px solid var(--status-failed-border);
   }
 
+  /* Documentation page */
+  .doc-layout {
+    @apply mx-auto grid w-full max-w-6xl gap-5;
+  }
+
+  @media (min-width: 1024px) {
+    .doc-layout {
+      grid-template-columns: 232px minmax(0, 1fr);
+      gap: 2rem;
+    }
+  }
+
+  .doc-sidebar {
+    @apply h-fit;
+  }
+
+  @media (min-width: 1024px) {
+    .doc-sidebar {
+      position: sticky;
+      top: 76px;
+      align-self: start;
+    }
+  }
+
+  .doc-toc {
+    @apply rounded-2xl border p-3 shadow-sm backdrop-blur-md;
+    border-color: var(--border-soft);
+    background: var(--surface-soft);
+  }
+
+  .doc-toc-title {
+    @apply px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider;
+    color: var(--ink-700);
+  }
+
+  .doc-toc-list {
+    @apply space-y-0.5;
+  }
+
+  .doc-toc-link,
+  .doc-toc-link-active {
+    @apply block rounded-lg border-l-2 px-3 py-1.5 text-[13px] transition-colors;
+  }
+
+  .doc-toc-link {
+    @apply border-transparent font-medium;
+    color: var(--ink-700);
+  }
+
+  .doc-toc-link:hover {
+    color: var(--ink-950);
+    background: rgba(59, 130, 246, 0.07);
+  }
+
+  .doc-toc-link-active {
+    @apply font-semibold;
+    color: var(--brand-700);
+    border-color: var(--brand-600);
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .doc-section {
+    scroll-margin-top: 80px;
+  }
+
+  .doc-num {
+    @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white;
+    background: linear-gradient(145deg, var(--brand-500), var(--brand-700));
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
+  }
+
+  .doc-code {
+    @apply rounded bg-slate-100 px-1.5 py-0.5 text-[0.85em] text-slate-700;
+  }
+
+  .loader-shimmer {
+    @apply pointer-events-none absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    animation: loader-shimmer 1.5s ease-in-out infinite;
+  }
+
   .disclaimer-bar {
     @apply text-xs text-center py-2 mt-8 border-t;
     color: var(--ink-700);
@@ -596,6 +677,39 @@
   100% {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes loader-shimmer {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(160%);
+  }
+}
+
+@keyframes loader-node-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes loader-edge-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes loader-ring-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

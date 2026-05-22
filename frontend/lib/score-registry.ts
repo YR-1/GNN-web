@@ -6,6 +6,12 @@ export interface ScoreDefinition {
   shortName: string
   category: ScoreCategory
   description: string
+  domain?: string
+  construct?: string
+  variableCode?: string
+  measureName?: string
+  detail?: string
+  interpretation?: string
   relevantROIs: number[]
   scoreRange: [number, number]
   unit: string
@@ -24,18 +30,26 @@ function range(start: number, end: number): number[] {
 export const SCORE_REGISTRY: ScoreDefinition[] = [
   {
     id: 'listsort_ageadj',
-    name: 'ListSort (Age Adjusted)',
+    name: 'ListSort (Working Memory)',
     shortName: 'ListSort',
     category: 'cognition',
-    description: 'NIH Toolbox List Sorting working memory score (age-adjusted).',
+    description: 'NIH Toolbox List Sorting working memory score.',
+    domain: 'Cognition / Working Memory',
+    construct: 'Working memory, updating, and sequencing',
+    variableCode: 'ListSort_AgeAdj',
+    measureName: 'NIH Toolbox List Sorting Working Memory Test: Age-Adjusted Scale Score',
+    detail:
+      'This task asks participants to sequence visually and orally presented foods and animals into size order. It measures working memory by combining information processing and short-term storage.',
+    interpretation:
+      'Higher scores indicate stronger working-memory performance. The age-adjusted score is normed to the participant age band, where 100 is average and 115 or 85 is about 1 SD above or below average.',
     relevantROIs: [
       ...range(1, 22), ...range(135, 156),
       ...range(44, 62), ...range(178, 196),
       ...range(63, 82), ...range(197, 216),
     ],
     scoreRange: [50, 150],
-    unit: 'AgeAdj',
-    accentColor: '#3B82F6',
+    unit: 'Scale score',
+    accentColor: '#2563eb',
   },
   {
     id: 'pmat',
@@ -43,13 +57,21 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     shortName: 'PMAT',
     category: 'cognition',
     description: 'Penn Matrix Analysis Test measuring fluid reasoning ability.',
+    domain: 'Cognition',
+    construct: 'Fluid intelligence / non-verbal reasoning',
+    variableCode: 'PMAT24_A_CR',
+    measureName: 'Penn Progressive Matrices: Number of Correct Responses',
+    detail:
+      'The PMAT presents visual matrix patterns with one missing item. Participants choose the option that best completes the pattern across items of increasing difficulty.',
+    interpretation:
+      'Higher scores indicate more correct responses and stronger fluid reasoning performance. The main score is the number of correct responses on the abbreviated 24-item task.',
     relevantROIs: [
       ...range(1, 22), ...range(135, 156),
       ...range(44, 62), ...range(178, 196),
     ],
     scoreRange: [0, 24],
-    unit: 'correct',
-    accentColor: '#8B5CF6',
+    unit: 'Responses',
+    accentColor: '#3b82f6',
   },
   {
     id: 'picseq',
@@ -57,14 +79,22 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     shortName: 'PicSeq',
     category: 'cognition',
     description: 'NIH Toolbox Picture Sequence Memory episodic memory score.',
+    domain: 'Cognition',
+    construct: 'Episodic memory',
+    variableCode: 'PicSeq_Unadj',
+    measureName: 'NIH Toolbox Picture Sequence Memory Test: Unadjusted Scale Score',
+    detail:
+      'This task measures acquisition, storage, and effortful recall by asking participants to remember and reproduce increasingly long sequences of illustrated objects and activities.',
+    interpretation:
+      'Higher scores indicate stronger episodic memory. The unadjusted scale score is normed to the adult NIH Toolbox sample, where 100 is average and 115 or 85 is about 1 SD above or below average.',
     relevantROIs: [
       ...range(1, 22), ...range(135, 156),
       ...range(63, 82), ...range(197, 216),
       ...range(101, 110), ...range(235, 244),
     ],
     scoreRange: [50, 150],
-    unit: 'AgeAdj',
-    accentColor: '#EC4899',
+    unit: 'Scale score',
+    accentColor: '#0f766e',
   },
   {
     id: 'sustained_attention',
@@ -79,37 +109,53 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     ],
     scoreRange: [0, 1],
     unit: 'd-prime',
-    accentColor: '#EC4899',
+    accentColor: '#8b5cf6',
   },
   {
     id: 'emotsupp_unadj',
-    name: 'EmotSupp (Emotional Support)',
-    shortName: 'Emotion',
+    name: 'Emotional Support (Empathy & Caring)',
+    shortName: 'EmotSupp',
     category: 'emotion',
-    description: 'Ability to receive emotional support from others.',
+    description: 'NIH Toolbox Emotional Support Survey unadjusted scale score.',
+    domain: 'Emotion',
+    construct: 'Perceived empathy, caring, and understanding from social support',
+    variableCode: 'EmotSupp_Unadj',
+    measureName: 'NIH Toolbox Emotional Support Survey: Unadjusted Scale Score',
+    detail:
+      'This self-report survey measures whether people in the participant social network are perceived as available to listen with empathy, caring, and understanding.',
+    interpretation:
+      'Higher scores indicate greater perceived emotional support. The unadjusted T-score has mean 50 and SD 10; scores at or below 40 suggest low support, while scores at or above 60 suggest high support.',
     relevantROIs: [
       ...range(101, 110), ...range(235, 244),
       ...range(63, 82), ...range(197, 216),
       ...range(111, 121), ...range(245, 255),
     ],
-    scoreRange: [0, 100],
-    unit: '% correct',
-    accentColor: '#EF4444',
+    scoreRange: [20, 80],
+    unit: 'Scale score',
+    accentColor: '#ef4444',
   },
   {
     id: 'psqi',
     name: 'PSQI (Sleep Quality)',
-    shortName: 'PSQI',
+    shortName: 'Sleep',
     category: 'emotion',
     description: 'Pittsburgh Sleep Quality Index derived from brain connectivity.',
+    domain: 'Alertness / sleep',
+    construct: 'Sleep quality',
+    variableCode: 'PSQI_Score',
+    measureName: 'Sleep (Pittsburgh Sleep Questionnaire) Total Score',
+    detail:
+      'The PSQI total score summarizes responses across the Pittsburgh Sleep Quality Index items to estimate overall sleep quality.',
+    interpretation:
+      'Higher PSQI scores generally indicate poorer sleep quality, so this score is interpreted in the opposite direction from the cognitive measures.',
     relevantROIs: [
       ...range(101, 110), ...range(235, 244),
       ...range(111, 121), ...range(245, 255),
       ...range(1, 22), ...range(135, 156),
     ],
     scoreRange: [0, 21],
-    unit: 'PSQI',
-    accentColor: '#F97316',
+    unit: 'Total score',
+    accentColor: '#10b981',
   },
 ]
 

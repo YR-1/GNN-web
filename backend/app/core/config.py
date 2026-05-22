@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # Expensive visualization artifacts. Keep false for faster upload/prediction.
     generate_plotly_json: bool = False
     generate_neuro_visuals: bool = True
+    store_embedded_neuro_visuals: bool = False
     torch_num_threads: int = 4
     torch_num_interop_threads: int = 1
     

@@ -572,8 +572,9 @@ export default function DashboardPage() {
                       <div className='mt-2 grid grid-cols-[minmax(0,1fr)_4rem] gap-3'>
                         <div>
                           <p className='text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500'>AVG ± SD</p>
-                          <p className='mt-0.5 text-[1.2rem] font-semibold leading-none' style={{ color: metric.accent }}>
-                            {formatMetricValue(metric, metric.average)} ± {formatSummarySpread(metric, std)}
+                          <p className='mt-0.5 text-[1.2rem] font-semibold leading-none text-slate-950'>
+                            <span style={{ color: metric.accent }}>{formatMetricValue(metric, metric.average)}</span>
+                            {' '}± {formatSummarySpread(metric, std)}
                           </p>
                         </div>
                         <div className='text-right'>

@@ -544,7 +544,7 @@ export default function Predictions2Page() {
               <div>
                 <div>
                   <h2 className='font-display text-lg font-semibold text-slate-950'>Correlation Matrix</h2>
-                  <p className='text-sm text-slate-700'>High-contrast ROI-to-ROI interaction heatmap for the loaded file.</p>
+                  <p className='text-sm text-slate-700'>268 x 268 Shen ROI correlation matrix heatmap computed from the uploaded fMRI time series.</p>
                 </div>
               </div>
               <CorrelationMatrix

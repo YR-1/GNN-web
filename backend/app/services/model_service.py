@@ -1360,14 +1360,19 @@ def _build_results_payload(
         prediction_errors = [f"graph-preprocessing: {exc}"]
         print(f"[model] Graph preprocessing failed: {exc}")
 
+    top_signal_roi_indices = [
+        int(idx)
+        for idx in np.argsort(np.nan_to_num(np.std(ts, axis=0), nan=0.0))[-min(5, int(n_rois)) :][::-1]
+    ]
+
     results = {
         "n_rois": int(n_rois),
         "n_timepoints": int(n_timepoints),
-        "correlation_matrix": np.round(corr_matrix.astype(float), decimals=6).tolist(),
+        "correlation_matrix": np.round(corr_matrix.astype(float), decimals=4).tolist(),
         "plotly_json": plotly_json,
         "file_size": file_size,
         "file_name": file_name,
-        "nilearn_connectome_html": nilearn_payload.get("html"),
+        "nilearn_connectome_html": nilearn_payload.get("html") if settings.store_embedded_neuro_visuals else None,
         "importance_brain_urls": get_cached_importance_brain_urls(),
         "importance_static_brain_urls": get_cached_importance_static_brain_urls(),
         "listsort_importance_brain_url": get_cached_listsort_importance_brain_url(),
@@ -1377,7 +1382,7 @@ def _build_results_payload(
         "connectome_library": nilearn_payload.get("library"),
         "connectome_coordinates_source": nilearn_payload.get("coordinates_source"),
         "connectome_error": nilearn_payload.get("error"),
-        "nilearn_markers_png_base64": markers_payload.get("png_base64"),
+        "nilearn_markers_png_base64": markers_payload.get("png_base64") if settings.store_embedded_neuro_visuals else None,
         "markers_library": markers_payload.get("library"),
         "markers_view": markers_payload.get("view"),
         "markers_error": markers_payload.get("error"),
@@ -1389,16 +1394,16 @@ def _build_results_payload(
         "model_registry": model_registry.get("models"),
         "time_series": {
             "source": "uploaded_file",
-            "default_view": "global_plus_first_5_rois",
+            "default_view": "global_plus_top_5_variable_rois",
             "tr_index": list(range(int(n_timepoints))),
             "global_signal": _round_float_list(np.mean(ts, axis=1)),
             "roi_series": [
                 {
                     "roi_index": idx + 1,
-                    "label": _get_roi_label(idx + 1),
+                    "label": f"ROI {idx + 1}",
                     "values": _round_float_list(ts[:, idx]),
                 }
-                for idx in range(min(5, int(n_rois)))
+                for idx in top_signal_roi_indices
             ],
         },
         "pipeline": {

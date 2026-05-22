@@ -15,7 +15,7 @@ export function BoldTimeSeries({
   timeSeries,
   highlightedTrIndex = null,
   title = 'BOLD Time Series',
-  subtitle = 'Real signal from your uploaded file: Global Signal + up to 5 ROI traces.',
+  subtitle = 'Global Signal = average across all ROIs; top 5 ROI traces by signal variability.',
 }: BoldTimeSeriesProps) {
   const plotRef = useRef<HTMLDivElement>(null)
   const plotlyRef = useRef<any>(null)
@@ -68,7 +68,7 @@ export function BoldTimeSeries({
           x: timeSeries.tr_index,
           y: roiSeries.values,
           mode: 'lines' as const,
-          name: roiSeries.label || `ROI ${roiSeries.roi_index}`,
+          name: `ROI ${roiSeries.roi_index}`,
           line: { width: 1.4 },
         })),
       ]
@@ -77,7 +77,7 @@ export function BoldTimeSeries({
         plotRef.current,
         traces,
         {
-          title: { text: 'Uploaded fMRI Time Series (Global + Most Important 5 ROIs)', font: { size: 16, color: '#0f172a' } },
+          title: { text: 'Uploaded fMRI Time Series (Global Signal + Top 5 Variable ROIs)', font: { size: 16, color: '#0f172a' } },
           xaxis: { title: { text: 'TR Index', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
           yaxis: { title: { text: 'Signal', font: { size: 12 } }, gridcolor: 'rgba(59,130,246,0.1)' },
           legend: { orientation: 'h' as const, y: -0.25, font: { size: 11 } },
@@ -179,7 +179,7 @@ export function BoldTimeSeries({
 
   const downloadAsCSV = () => {
     if (!timeSeries) return
-    const header = ['TR Index', 'Global Signal', ...timeSeries.roi_series.map((series) => series.label || `ROI ${series.roi_index}`)]
+    const header = ['TR Index', 'Global Signal', ...timeSeries.roi_series.map((series) => `ROI ${series.roi_index}`)]
     const rows = timeSeries.tr_index.map((tr, index) => [
       tr,
       timeSeries.global_signal[index],

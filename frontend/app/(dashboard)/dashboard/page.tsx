@@ -502,7 +502,7 @@ export default function DashboardPage() {
     <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
       <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-3 sm:px-4.5'>
         <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>
-          Population Brain Prediction Dashboard
+            Group Brain Behavior Prediction Dashboard
         </h1>
         <p className='mt-0.5 text-[12px] text-slate-600'>
           Cohort-wide fMRI-derived behavioral prediction monitoring.

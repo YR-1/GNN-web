@@ -73,6 +73,12 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
+function withAssetVersion(pathOrUrl?: string | null, version = 'static-brain-v2'): string | null {
+  if (!pathOrUrl) return null
+  const separator = pathOrUrl.includes('?') ? '&' : '?'
+  return `${pathOrUrl}${separator}v=${version}`
+}
+
 export function PredictionReport({
   analysis,
   heading = 'Prediction Report',
@@ -168,7 +174,7 @@ export function PredictionReport({
       results?.importance_static_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === 'listsort_ageadj' ? results?.listsort_importance_static_brain_url : null) ??
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
-    return toBackendUrl(path)
+    return withAssetVersion(toBackendUrl(path))
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
 
   if (analysis.status !== 'completed') {

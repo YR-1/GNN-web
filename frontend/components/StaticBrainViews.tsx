@@ -27,11 +27,11 @@ export default function StaticBrainViews({
       <div className='surface-card flex h-full min-h-0 w-full flex-col p-0'>
         <div className='flex h-full min-h-0 w-full flex-1 overflow-hidden bg-white p-0'>
           <div className='relative flex h-full min-h-0 w-full flex-1 overflow-hidden'>
-            <div className='flex min-h-0 flex-1 overflow-hidden pb-0'>
+            <div className='flex min-h-0 flex-1 items-center overflow-hidden pb-0'>
               <img
                 src={staticBrainUrl}
                 alt={`4-panel anatomical ${scoreShortName} model importance brain`}
-                className='h-full w-full object-contain'
+                className='max-h-full w-full object-contain'
                 loading='lazy'
                 decoding='async'
               />
@@ -46,7 +46,7 @@ export default function StaticBrainViews({
               <p className='absolute text-[10px] text-ink-700' style={{ left: '54%', bottom: '12px' }}>
                 Right Sagittal
               </p>
-              <p className='absolute text-[10px] text-ink-700' style={{ left: '76%', bottom: '12px' }}>
+              <p className='absolute text-[10px] text-ink-700' style={{ left: '77.8%', bottom: '12px' }}>
                 Axial
               </p>
             </div>

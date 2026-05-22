@@ -66,6 +66,12 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
+function withAssetVersion(pathOrUrl?: string | null, version = 'static-brain-v2'): string | null {
+  if (!pathOrUrl) return null
+  const separator = pathOrUrl.includes('?') ? '&' : '?'
+  return `${pathOrUrl}${separator}v=${version}`
+}
+
 function formatValue(value: number, scoreDef: ScoreDefinition): string {
   const range = scoreDef.scoreRange[1] - scoreDef.scoreRange[0]
   if (range <= 1) return value.toFixed(2)
@@ -290,7 +296,7 @@ export default function Predictions2Page() {
       results?.importance_static_brain_urls?.[selectedScore.id] ??
       (selectedScore.id === PRIMARY_VISUAL_SCORE_ID ? results?.listsort_importance_static_brain_url : null) ??
       FALLBACK_IMPORTANCE_STATIC_BRAIN_PATHS[selectedScore.id]
-    return toBackendUrl(path)
+    return withAssetVersion(toBackendUrl(path))
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
   const metricScores = SCORE_REGISTRY.filter((score) => PREDICTIONS2_SCORE_IDS.includes(score.id))
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
@@ -346,7 +352,7 @@ export default function Predictions2Page() {
           <Link href='/upload' className='btn-primary'>
             Upload data
           </Link>
-          <Link href='/predictions2' className='btn-secondary'>
+          <Link href='/predictions' className='btn-secondary'>
             Open Predictions
           </Link>
         </div>
@@ -357,7 +363,7 @@ export default function Predictions2Page() {
   return (
     <div className='overflow-hidden rounded-[1.9rem] border border-slate-200/90 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
       <header className='bg-[linear-gradient(180deg,rgba(245,248,255,0.96),rgba(239,244,255,0.92))] px-4 py-2.5 sm:px-4.5'>
-        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>Predicted Brain Behavior Dashboard</h1>
+        <h1 className='font-display text-[1.32rem] font-semibold text-slate-950 sm:text-[1.42rem]'>Individual Brain Behavior Prediction Dashboard</h1>
         <p className='mt-0.5 text-[12px] text-slate-600'>
           File: <span className='mono-data'>{results.file_name}</span>
         </p>
@@ -403,7 +409,7 @@ export default function Predictions2Page() {
                   )}
                 </div>
 
-                <section className='overflow-hidden'>
+                <section className='max-h-[15rem] overflow-hidden'>
                   <div className='h-full overflow-hidden [&_.surface-card]:h-full [&_.surface-card]:space-y-0 [&_.surface-card]:bg-transparent [&_.surface-card]:p-0 [&_.surface-card]:shadow-none [&_.border-t]:hidden [&_img]:mx-auto [&_img]:h-full [&_img]:w-full [&_img]:object-contain'>
                     <StaticBrainViews
                       markersPngBase64={results.nilearn_markers_png_base64}

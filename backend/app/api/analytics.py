@@ -41,11 +41,11 @@ CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 MODEL_PERFORMANCE_SEEDS = [
-    ("listsort_ageadj", "ListSort (Age Adjusted)", 0.882, 0.00041, 3.28, 1.2),
-    ("pmat", "PMAT (Fluid Intelligence)", 0.844, 0.00073, 3.71, 2.4),
-    ("picseq", "PicSeq (Picture Sequence Memory)", 0.806, 0.00124, 4.09, 3.1),
-    ("emotsupp_unadj", "EmotSupp (Emotional Support)", 0.769, 0.00215, 4.85, 5.4),
-    ("psqi", "PSQI (Sleep Quality)", 0.747, 0.00301, 5.13, 6.2),
+    ("listsort_ageadj", "ListSort (Working Memory)", "FBNetGen", 0.882, 0.00041, 3.28, 1.2),
+    ("pmat", "PMAT (Fluid Intelligence)", "GAT", 0.844, 0.00073, 3.71, 2.4),
+    ("picseq", "PicSeq (Picture Sequence Memory)", "FBNetGen", 0.806, 0.00124, 4.09, 3.1),
+    ("emotsupp_unadj", "Emotional Support (Empathy & Caring)", "BrainGNN", 0.769, 0.00215, 4.85, 5.4),
+    ("psqi", "PSQI (Sleep Quality)", "BrainGNN", 0.747, 0.00301, 5.13, 6.2),
 ]
 
 
@@ -62,11 +62,12 @@ def _generate_scatter_data(seed: float, correlation: float) -> list[dict]:
 
 def _build_model_performance_payload() -> list[dict]:
     payload = []
-    for model_id, behavioral_score, correlation, p_value, mse, seed in MODEL_PERFORMANCE_SEEDS:
+    for model_id, behavioral_score, gnn_architecture, correlation, p_value, mse, seed in MODEL_PERFORMANCE_SEEDS:
         payload.append(
             {
                 "id": model_id,
                 "behavioralScore": behavioral_score,
+                "gnnArchitecture": gnn_architecture,
                 "correlation": correlation,
                 "pValue": p_value,
                 "mse": mse,

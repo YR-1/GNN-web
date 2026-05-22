@@ -117,6 +117,7 @@ class ModelPerformanceItem(BaseModel):
     """Model performance metrics for a behavioral score."""
     id: str
     behavioralScore: str
+    gnnArchitecture: str
     correlation: float
     pValue: float
     mse: float

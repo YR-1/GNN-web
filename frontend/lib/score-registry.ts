@@ -34,8 +34,8 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
     shortName: 'ListSort',
     category: 'cognition',
     description: 'NIH Toolbox List Sorting working memory score.',
-    domain: 'Cognition',
-    construct: 'Working memory',
+    domain: 'Cognition / Working Memory',
+    construct: 'Working memory, updating, and sequencing',
     variableCode: 'ListSort_AgeAdj',
     measureName: 'NIH Toolbox List Sorting Working Memory Test: Age-Adjusted Scale Score',
     detail:
@@ -48,7 +48,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
       ...range(63, 82), ...range(197, 216),
     ],
     scoreRange: [50, 150],
-    unit: 'AgeAdj',
+    unit: 'Scale score',
     accentColor: '#2563eb',
   },
   {
@@ -70,7 +70,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
       ...range(44, 62), ...range(178, 196),
     ],
     scoreRange: [0, 24],
-    unit: 'correct',
+    unit: 'Responses',
     accentColor: '#3b82f6',
   },
   {
@@ -93,7 +93,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
       ...range(101, 110), ...range(235, 244),
     ],
     scoreRange: [50, 150],
-    unit: 'Unadj',
+    unit: 'Scale score',
     accentColor: '#0f766e',
   },
   {
@@ -113,12 +113,12 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
   },
   {
     id: 'emotsupp_unadj',
-    name: 'Emotional Support (Empathy & Care)',
+    name: 'Emotional Support (Empathy & Caring)',
     shortName: 'EmotSupp',
     category: 'emotion',
-    description: 'NIH Toolbox Emotional Support Survey unadjusted T-score.',
+    description: 'NIH Toolbox Emotional Support Survey unadjusted scale score.',
     domain: 'Emotion',
-    construct: 'Social support / perceived emotional support',
+    construct: 'Perceived empathy, caring, and understanding from social support',
     variableCode: 'EmotSupp_Unadj',
     measureName: 'NIH Toolbox Emotional Support Survey: Unadjusted Scale Score',
     detail:
@@ -131,13 +131,13 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
       ...range(111, 121), ...range(245, 255),
     ],
     scoreRange: [20, 80],
-    unit: 'T-score',
+    unit: 'Scale score',
     accentColor: '#ef4444',
   },
   {
     id: 'psqi',
     name: 'PSQI (Sleep Quality)',
-    shortName: 'PSQI',
+    shortName: 'Sleep',
     category: 'emotion',
     description: 'Pittsburgh Sleep Quality Index derived from brain connectivity.',
     domain: 'Alertness / sleep',
@@ -154,7 +154,7 @@ export const SCORE_REGISTRY: ScoreDefinition[] = [
       ...range(1, 22), ...range(135, 156),
     ],
     scoreRange: [0, 21],
-    unit: 'PSQI',
+    unit: 'Total score',
     accentColor: '#10b981',
   },
 ]

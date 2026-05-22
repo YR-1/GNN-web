@@ -6,10 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
-import { getROILabel } from '@/lib/shen268-labels'
 import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
 import { simulateScore, type SimulatedScoreResult } from '@/lib/score-simulator'
-import type { AnalysisResponse, CorrelationResults, ExplainedScore, HistoryItem, TimeSeriesPayload } from '@/lib/types'
+import type { AnalysisResponse, CorrelationResults, HistoryItem } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
 
 const CorrelationMatrix = dynamic(() => import('@/components/CorrelationMatrix'), { ssr: false })
@@ -90,48 +89,6 @@ function scorePercent(value: number, scoreDef: ScoreDefinition): number {
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))
 }
 
-function getExplainedScore(results: CorrelationResults | undefined, scoreId: string): ExplainedScore | undefined {
-  return results?.explained_scores?.find((score) => toCanonicalScoreId(score.score_id) === scoreId)
-}
-
-function buildFocusedTimeSeries(
-  baseTimeSeries: TimeSeriesPayload | undefined,
-  results: CorrelationResults | undefined,
-  scoreId: string
-): TimeSeriesPayload | undefined {
-  if (!baseTimeSeries) return undefined
-
-  const explainedScore = getExplainedScore(results, scoreId)
-  const topRoiIndices = explainedScore?.roi_importance
-    ?.slice()
-    .sort((a, b) => b.importance - a.importance)
-    .slice(0, 5)
-    .map((roi) => roi.roi_index)
-
-  if (!topRoiIndices || topRoiIndices.length === 0) {
-    return baseTimeSeries
-  }
-
-  const roiSeries = topRoiIndices
-    .map((roiIndex) => {
-      const existing = baseTimeSeries.roi_series.find((series) => series.roi_index === roiIndex)
-      if (existing) {
-        return { ...existing, label: existing.label || getROILabel(existing.roi_index) }
-      }
-      return null
-    })
-    .filter((series): series is NonNullable<typeof series> => Boolean(series))
-
-  if (roiSeries.length === 0) {
-    return baseTimeSeries
-  }
-
-  return {
-    ...baseTimeSeries,
-    roi_series: roiSeries,
-  }
-}
-
 const METRIC_BAR_ACCENTS: Record<string, string> = {
   listsort_ageadj: '#3B82F6',
   pmat: '#8B5CF6',
@@ -143,6 +100,47 @@ const METRIC_BAR_ACCENTS: Record<string, string> = {
 const PREDICTIONS2_SCORE_IDS = ['listsort_ageadj', 'pmat', 'picseq', 'emotsupp_unadj', 'psqi']
 const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
   sustained_attention: 'picseq',
+}
+
+function ScoreInfoTooltip({ score }: { score: ScoreDefinition }) {
+  return (
+    <span className='group relative inline-flex'>
+      <span
+        className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500 transition hover:border-slate-500 hover:bg-white hover:text-slate-900'
+        aria-label={`${score.name} information`}
+      >
+        <Info className='h-2.5 w-2.5' />
+      </span>
+      <span className='pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-[min(25rem,82vw)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-relaxed text-slate-700 shadow-xl group-hover:inline-block'>
+        <span className='block text-sm font-semibold text-slate-950'>{score.name}</span>
+        {score.domain ? (
+          <span className='mt-2 block'>
+            <span className='font-semibold text-slate-950'>Area: </span>
+            {score.domain}
+          </span>
+        ) : null}
+        {score.construct ? (
+          <span className='mt-1.5 block'>
+            <span className='font-semibold text-slate-950'>Measures: </span>
+            {score.construct}
+          </span>
+        ) : null}
+        {score.measureName ? (
+          <span className='mt-1.5 block'>
+            <span className='font-semibold text-slate-950'>Full measure: </span>
+            {score.measureName}
+          </span>
+        ) : null}
+        {score.detail ? <span className='mt-2 block text-slate-600'>{score.detail}</span> : null}
+        {score.interpretation ? (
+          <span className='mt-3 block rounded-xl bg-slate-50 p-3'>
+            <span className='font-semibold text-slate-950'>How to read it: </span>
+            {score.interpretation}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  )
 }
 
 export default function Predictions2Page() {
@@ -298,10 +296,7 @@ export default function Predictions2Page() {
   const cognitionMetricScores = metricScores.filter((score) => score.category === 'cognition')
   const emotionMetricScores = metricScores.filter((score) => score.category === 'emotion')
 
-  const focusedTimeSeries = useMemo(
-    () => buildFocusedTimeSeries(results?.time_series, results, selectedScore?.id ?? ''),
-    [results, selectedScore]
-  )
+  const focusedTimeSeries = results?.time_series
 
   const timeSeriesMaxIndex = Math.max((focusedTimeSeries?.tr_index.length ?? 1) - 1, 0)
 
@@ -470,13 +465,7 @@ export default function Predictions2Page() {
                                 <div className='min-w-0'>
                                   <div className='flex items-center gap-1.5'>
                                     <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
-                                    <span
-                                      className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500'
-                                      title={score.description}
-                                      aria-label={`${score.name} info`}
-                                    >
-                                      <Info className='h-2.5 w-2.5' />
-                                    </span>
+                                    <ScoreInfoTooltip score={score} />
                                   </div>
                                   <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
                                     <p className='text-slate-500'>{score.unit}</p>
@@ -533,7 +522,7 @@ export default function Predictions2Page() {
                 <div>
                   <h2 className='font-display text-lg font-semibold text-slate-950'>Time Series Graph</h2>
                   <p className='text-sm text-slate-700'>
-                    Global Average plus the top 5 critical ROIs identified by the current GNN explanation when available.
+                    Global Signal = average across all ROIs; top 5 ROI traces by signal variability.
                   </p>
                 </div>
               </div>

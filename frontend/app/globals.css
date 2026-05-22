@@ -652,6 +652,12 @@
     @apply rounded bg-slate-100 px-1.5 py-0.5 text-[0.85em] text-slate-700;
   }
 
+  .loader-shimmer {
+    @apply pointer-events-none absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    animation: loader-shimmer 1.5s ease-in-out infinite;
+  }
+
   .disclaimer-bar {
     @apply text-xs text-center py-2 mt-8 border-t;
     color: var(--ink-700);
@@ -671,6 +677,39 @@
   100% {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes loader-shimmer {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(160%);
+  }
+}
+
+@keyframes loader-node-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes loader-edge-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes loader-ring-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

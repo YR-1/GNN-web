@@ -192,7 +192,7 @@ class SupabaseDbService:
 
         score_files = {
             "listsort_ageadj": "listsort_fbnetgen_importance_top100.json",
-            "pmat": "pmat_braingnn_importance_top100.json",
+            "pmat": "pmat_gatv2_importance_top100.json",
             "picseq": "picseq_fbnetgen_importance_top100.json",
             "emotsupp_unadj": "emotsupp_reggnn_importance_top100.json",
             "emotsupp_unadj": "emotsupp_reggnn_importance_top100.json",

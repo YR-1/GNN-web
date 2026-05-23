@@ -688,18 +688,18 @@ def _rebuild_model_from_checkpoint(loaded_obj: Dict[str, Any], sample_graph: Any
     except Exception as exc:
         print(f"[model] T-RegGNN reconstruction skipped: {exc}")
         
-    # --- BrainGNN (pmat.pt and similar) ---
+    # --- GATv2 / PMAT GATv2 checkpoints ---
     try:
-        from .braingnn_inference import build_braingnn_from_checkpoint, is_braingnn_state_dict
+        from .gatv2_inference import build_gatv2_from_checkpoint, is_gatv2_state_dict
 
-        if is_braingnn_state_dict(state_dict):
-            model, architecture, _ = build_braingnn_from_checkpoint(loaded_obj)
+        if is_gatv2_state_dict(state_dict):
+            model, architecture, _ = build_gatv2_from_checkpoint(loaded_obj)
             setattr(model, "_checkpoint_architecture", architecture)
             setattr(model, "_prediction_scale", "normalized")
             print(f"[model] Reconstructed checkpoint architecture: {architecture}")
             return model
     except Exception as exc:
-        print(f"[model] BrainGNN reconstruction skipped: {exc}")
+        print(f"[model] GATv2 reconstruction skipped: {exc}")
 
     # --- FBNetGen / GATv2 ---
     in_dim = _infer_input_dim_from_checkpoint(state_dict, sample_graph)

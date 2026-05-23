@@ -1,10 +1,11 @@
 {
   "method": "standard",
-  "original_mean": 16.60169491525424,
-  "original_std": 4.580984703759208,
-  "original_min": 6.000000377052405,
-  "original_max": 23.000000051383484,
-  "n_train_windows": 10620,
+  "original_mean": 16.752136752136753,
+  "original_std": 4.538356912857157,
+  "original_min": 6.000000093675876,
+  "original_max": 22.999999857834673,
+  "n_train_windows": 10530,
   "target_variable": "PMAT24_A_CR",
-  "fold_pkl": "/content/drive/MyDrive/all_sub_PMAT24_A_CR/graphs_outer5_inner5.pkl"
+  "fold_pkl": "/content/drive/MyDrive/all_sub_PMAT24_A_CR/graphs_outer2_inner5.pkl",
+  "model": "GATv2 CPM"
 }

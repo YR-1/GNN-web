@@ -48,6 +48,47 @@ const PIPELINE_STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   },
 ]
 
+/** Model architectures used across the five predicted behavioral scores. */
+const MODEL_ARCHITECTURES: {
+  name: string
+  predicts: string
+  approach: string
+  explainability: string
+  referenceLabel: string
+  referenceUrl: string
+}[] = [
+  {
+    name: 'FBNetGen',
+    predicts: 'ListSort · PicSeq',
+    approach:
+      'Applies dynamic graph attention (GAT) across the functional connectome, learning edge-level weights that reflect the predictive relevance of each region-to-region connection. Each sliding window is encoded independently; subject-level predictions are obtained by averaging across windows.',
+    explainability:
+      'Node importance is derived from four complementary methods — integrated gradients, vanilla saliency, occlusion, and pool-gate attention — aggregated into a consensus z-score across all 268 ROIs.',
+    referenceLabel: 'Wayfear/FBNETGEN',
+    referenceUrl: 'https://github.com/Wayfear/FBNETGEN',
+  },
+  {
+    name: 'T-RegGNN',
+    predicts: 'EmoTSupp · PSQI',
+    approach:
+      'Applies graph convolution over each windowed connectivity matrix, then aggregates window embeddings using a temporal attention mechanism that learns the relative importance of each time segment. Unlike window-averaging approaches, this preserves the dynamic structure of the resting-state signal.',
+    explainability:
+      'Node and edge importance are derived from integrated gradients and occlusion. Temporal attention weights and window occlusion additionally identify which segments of the scan most influenced the prediction — a capability unique to this architecture.',
+    referenceLabel: 'basiralab/RegGNN',
+    referenceUrl: 'https://github.com/basiralab/RegGNN',
+  },
+  {
+    name: 'BrainGNN',
+    predicts: 'PMAT24',
+    approach:
+      'Applies a network-aware graph convolution (RaGConv) that soft-assigns each ROI to one of the eight Shen functional networks, giving each network its own learned transformation. The graph is then progressively pruned from 268 to 134 to 67 ROIs via differentiable TopK pooling, retaining only the regions most relevant to the prediction.',
+    explainability:
+      'Region importance scores emerge directly from the pooling layers, which are explicitly regularised during training via interpretability losses (TopK and graph-label consistency). No post-hoc attribution is required.',
+    referenceLabel: 'xxlya/BrainGNN_Pytorch',
+    referenceUrl: 'https://github.com/xxlya/BrainGNN_Pytorch',
+  },
+]
+
 /** Ordered quick-start checklist for new users. */
 const QUICK_START: string[] = [
   'Sign in, then open the Upload page.',
@@ -252,6 +293,67 @@ export function DocumentationContent() {
                   Treating the brain as a graph lets the model learn from the <em>pattern of connections</em> between
                   regions, not just the activity of each region on its own.
                 </p>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Models ------------------------------------------------------- */}
+          <section id='models' className='doc-section'>
+            <Card className='bg-white/80'>
+              <SectionHeading icon={Brain}>Models</SectionHeading>
+              <CardContent className='pt-5 space-y-4'>
+                <p className='text-slate-700'>
+                  Five models were trained independently, one per behavioural measure. Each model receives a functional
+                  connectivity graph derived from naturalistic fMRI — specifically a movie-watching condition from the dataset introduced by{' '}
+                  <a
+                    href='https://github.com/esfinn/movie_cpm'
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='font-medium text-blue-600 hover:text-blue-800 hover:underline'
+                  >
+                    Finn et al.
+                  </a>{' '}
+                  — as input and outputs a single predicted score. The three architectures differ in how they
+                  aggregate connectivity information across regions and time.
+                </p>
+
+                <div className='space-y-4'>
+                  {MODEL_ARCHITECTURES.map((model) => (
+                    <div
+                      key={model.name}
+                      className='flex h-full flex-col rounded-xl border border-brand-400/15 bg-blue-50/45 p-4'
+                    >
+                      <div className='flex items-start justify-between gap-3'>
+                        <div>
+                          <h3 className='text-lg font-semibold text-slate-950'>{model.name}</h3>
+                          <p className='mt-1 text-xs font-medium uppercase tracking-wide text-blue-700'>
+                            Predicts: {model.predicts}
+                          </p>
+                        </div>
+                        <Brain className='h-5 w-5 shrink-0 text-blue-600' />
+                      </div>
+
+                      <div className='mt-4 space-y-3 text-[13px] leading-relaxed text-slate-600'>
+                        <p>
+                          <strong className='text-slate-900'>Approach:</strong> {model.approach}
+                        </p>
+                        <p>
+                          <strong className='text-slate-900'>Explainability:</strong> {model.explainability}
+                        </p>
+                      </div>
+
+                      <a
+                        href={model.referenceUrl}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='mt-4 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline'
+                      >
+                        {model.referenceLabel}
+                        <ExternalLink className='h-4 w-4' />
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </section>

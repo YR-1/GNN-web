@@ -66,7 +66,7 @@ function toBackendUrl(pathOrUrl?: string | null): string | null {
   return `${API_BASE_URL.replace(/\/$/, '')}/${pathOrUrl.replace(/^\//, '')}`
 }
 
-function withAssetVersion(pathOrUrl?: string | null, version = 'static-brain-v2'): string | null {
+function withAssetVersion(pathOrUrl?: string | null, version = 'static-brain-v3'): string | null {
   if (!pathOrUrl) return null
   const separator = pathOrUrl.includes('?') ? '&' : '?'
   return `${pathOrUrl}${separator}v=${version}`

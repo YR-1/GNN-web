@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Brain, Heart, Info } from 'lucide-react'
 import { api, API_BASE_URL } from '@/lib/api'
 import { SCORE_REGISTRY, type ScoreDefinition } from '@/lib/score-registry'
@@ -108,44 +109,38 @@ const PREDICTIONS2_SCORE_ALIASES: Record<string, string> = {
   sustained_attention: 'picseq',
 }
 
-function ScoreInfoTooltip({ score }: { score: ScoreDefinition }) {
+function ScoreInfoTooltip({ score, x, y }: { score: ScoreDefinition; x: number; y: number }) {
   return (
-    <span className='group relative inline-flex'>
-      <span
-        className='inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500 transition hover:border-slate-500 hover:bg-white hover:text-slate-900'
-        aria-label={`${score.name} information`}
-      >
-        <Info className='h-2.5 w-2.5' />
-      </span>
-      <span className='pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-[min(25rem,82vw)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-relaxed text-slate-700 shadow-xl group-hover:inline-block'>
-        <span className='block text-sm font-semibold text-slate-950'>{score.name}</span>
-        {score.domain ? (
-          <span className='mt-2 block'>
+    <div
+      className='pointer-events-none fixed z-[9999] w-80 max-w-[calc(100vw-3rem)] rounded-[0.9rem] border border-slate-200 bg-white p-3 text-left shadow-xl ring-1 ring-slate-900/5'
+      style={{ left: x, top: y }}
+    >
+      <p className='text-[12px] font-semibold leading-snug text-slate-950'>{score.name}</p>
+      <div className='mt-2 grid gap-1.5 text-[11px] text-slate-700'>
+        {score.domain || score.construct ? (
+          <div>
             <span className='font-semibold text-slate-950'>Area: </span>
-            {score.domain}
-          </span>
+            {[score.domain, score.construct].filter(Boolean).join(' - ')}
+          </div>
         ) : null}
-        {score.construct ? (
-          <span className='mt-1.5 block'>
-            <span className='font-semibold text-slate-950'>Measures: </span>
-            {score.construct}
-          </span>
-        ) : null}
+        <div>
+          <span className='font-semibold text-slate-950'>Measures: </span>
+          {score.detail ?? score.description}
+        </div>
         {score.measureName ? (
-          <span className='mt-1.5 block'>
+          <div>
             <span className='font-semibold text-slate-950'>Full measure: </span>
             {score.measureName}
-          </span>
+          </div>
         ) : null}
-        {score.detail ? <span className='mt-2 block text-slate-600'>{score.detail}</span> : null}
-        {score.interpretation ? (
-          <span className='mt-3 block rounded-xl bg-slate-50 p-3'>
-            <span className='font-semibold text-slate-950'>How to read it: </span>
-            {score.interpretation}
-          </span>
-        ) : null}
-      </span>
-    </span>
+      </div>
+      {score.interpretation ? (
+        <div className='mt-2 rounded-[0.65rem] bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-700'>
+          <span className='font-semibold text-slate-950'>How to read it: </span>
+          {score.interpretation}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -162,6 +157,23 @@ export default function Predictions2Page() {
   const [error, setError] = useState('')
   const [currentTrIndex, setCurrentTrIndex] = useState(0)
   const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
+  const [hoveredScoreInfo, setHoveredScoreInfo] = useState<{ score: ScoreDefinition; x: number; y: number } | null>(null)
+
+  const showScoreInfo = (score: ScoreDefinition, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const tooltipWidth = 320
+    const viewportPadding = 12
+    const x = Math.min(
+      Math.max(rect.left, viewportPadding),
+      window.innerWidth - tooltipWidth - viewportPadding
+    )
+
+    setHoveredScoreInfo({
+      score,
+      x,
+      y: rect.bottom + 8,
+    })
+  }
 
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
@@ -457,10 +469,17 @@ export default function Predictions2Page() {
                           const accent = METRIC_BAR_ACCENTS[score.id] ?? score.accentColor
 
                           return (
-                            <button
+                            <div
                               key={score.id}
-                              type='button'
+                              role='button'
+                              tabIndex={0}
                               onClick={() => setSelectedScoreId(score.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setSelectedScoreId(score.id)
+                                }
+                              }}
                               className={`w-full rounded-[0.95rem] border px-3 py-2 text-left transition ${
                                 selectedScore?.id === score.id
                                   ? 'border-slate-300 bg-slate-100 shadow-sm'
@@ -471,10 +490,23 @@ export default function Predictions2Page() {
                                 <div className='min-w-0'>
                                   <div className='flex items-center gap-1.5'>
                                     <p className='truncate text-[12px] font-medium text-slate-900'>{score.name}</p>
-                                    <ScoreInfoTooltip score={score} />
+                                    <span
+                                      className='inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-500 transition hover:border-slate-500 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300'
+                                      role='img'
+                                      tabIndex={0}
+                                      aria-label={`${score.name} info`}
+                                      onMouseEnter={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onMouseLeave={() => setHoveredScoreInfo(null)}
+                                      onFocus={(event) => showScoreInfo(score, event.currentTarget)}
+                                      onBlur={() => setHoveredScoreInfo(null)}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                      }}
+                                    >
+                                      <Info className='h-2.5 w-2.5' />
+                                    </span>
                                   </div>
                                   <div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]'>
-                                    <p className='text-slate-500'>{score.unit}</p>
                                     <p className='text-slate-400'>{formatRangeLabel(score)}</p>
                                   </div>
                                 </div>
@@ -493,7 +525,7 @@ export default function Predictions2Page() {
                                   }}
                                 />
                               </div>
-                            </button>
+                            </div>
                           )
                         })}
                       </div>
@@ -543,6 +575,12 @@ export default function Predictions2Page() {
         </div>
       </section>
       </div>
+      {hoveredScoreInfo && typeof document !== 'undefined'
+        ? createPortal(
+            <ScoreInfoTooltip score={hoveredScoreInfo.score} x={hoveredScoreInfo.x} y={hoveredScoreInfo.y} />,
+            document.body
+          )
+        : null}
     </div>
   )
 }

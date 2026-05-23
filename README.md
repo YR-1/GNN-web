@@ -112,17 +112,6 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 Create a Supabase project, enable email/password auth, then run the SQL below in the Supabase SQL Editor for a fresh database.
 
-### Auth Redirect URLs
-
-In Supabase Dashboard > Authentication > URL Configuration:
-
-- Set the Site URL to the deployed frontend URL, for example `https://gnn-web.vercel.app`.
-- Add both local and deployed login URLs to Redirect URLs:
-  - `http://localhost:3000/login`
-  - `https://gnn-web.vercel.app/login`
-
-The frontend signup flow sends Supabase an `emailRedirectTo` based on the current browser origin. Local signup confirmation links return to localhost, while deployed signup confirmation links return to the deployed site.
-
 Create a public Supabase Storage bucket named:
 
 ```txt

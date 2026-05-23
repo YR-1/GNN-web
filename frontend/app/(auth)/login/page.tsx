@@ -45,6 +45,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const { login, user, loading: authLoading } = useAuthStore()
   const redirectTo = searchParams.get('from') || '/dashboard'
+  const verified = searchParams.get('verified') === '1'
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -88,6 +89,12 @@ function LoginForm() {
             <p className='text-xs text-ink-700 text-center mt-2'>
               Your session is kept in this browser for faster return access.
             </p>
+
+            {verified && (
+              <div className='status-banner status-banner-success mt-6' role='status'>
+                <p>Email verified. Please sign in to continue.</p>
+              </div>
+            )}
 
             {error && (
               <div className='status-banner status-banner-error mt-6' role='alert' aria-live='polite'>

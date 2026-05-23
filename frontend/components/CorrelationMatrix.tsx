@@ -19,11 +19,16 @@ export default function CorrelationMatrix({
 }: CorrelationMatrixProps) {
   const plotRef = useRef<HTMLDivElement>(null)
   const plotlyRef = useRef<any>(null)
-  const downloadButtonStyle = {
-    backgroundColor: '#949bad',
-    borderColor: '#949bad',
-    color: '#ffffff',
-  } as const
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
 
   const getCurrentRanges = () => {
     const plotEl = plotRef.current as unknown as {
@@ -132,26 +137,16 @@ export default function CorrelationMatrix({
 
   const downloadAsJSON = () => {
     const dataString = JSON.stringify(data, null, 2)
-    const blob = new Blob([dataString], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `correlation_matrix_${Date.now()}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const blob = new Blob([dataString], { type: 'application/json;charset=utf-8' })
+    downloadBlob(blob, `correlation_matrix_${Date.now()}.json`)
   }
 
   const downloadAsCSV = () => {
     const csvContent = data.correlation_matrix
-      .map((row) => row.map((value) => value.toFixed(4)).join('\t'))
+      .map((row) => row.map((value) => value.toFixed(4)).join(','))
       .join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `correlation_matrix_${Date.now()}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8' })
+    downloadBlob(blob, `correlation_matrix_${Date.now()}.csv`)
   }
 
   const setDragMode = (mode: 'zoom' | 'pan' | 'select' | 'lasso') => {
@@ -232,15 +227,25 @@ export default function CorrelationMatrix({
           <button type='button' onClick={() => setDragMode('select')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Box Select</button>
           <button type='button' onClick={() => setDragMode('lasso')} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Lasso</button>
           <button type='button' onClick={resetView} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>Home / Reset</button>
-          <button type='button' onClick={downloadAsPNG} className='btn-secondary text-xs px-3 py-1.5 gap-1.5'>PNG</button>
         </div>
 
         <div className='mt-4 flex gap-2'>
           <button
             type='button'
+            onClick={downloadAsPNG}
+            className='btn-download-action'
+          >
+            <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
+              <path d='M12 4v9' strokeLinecap='round' />
+              <path d='M8.5 9.5 12 13l3.5-3.5' strokeLinecap='round' strokeLinejoin='round' />
+              <path d='M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' strokeLinecap='round' strokeLinejoin='round' />
+            </svg>
+            <span>PNG</span>
+          </button>
+          <button
+            type='button'
             onClick={downloadAsJSON}
-            className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
-            style={downloadButtonStyle}
+            className='btn-download-action'
           >
             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
               <path d='M12 4v9' strokeLinecap='round' />
@@ -252,8 +257,7 @@ export default function CorrelationMatrix({
           <button
             type='button'
             onClick={downloadAsCSV}
-            className='btn-secondary text-xs px-3 py-1.5 gap-1.5'
-            style={downloadButtonStyle}
+            className='btn-download-action'
           >
             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8' className='h-3.5 w-3.5' aria-hidden='true'>
               <path d='M12 4v9' strokeLinecap='round' />

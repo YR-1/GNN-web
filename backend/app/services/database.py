@@ -217,7 +217,7 @@ class SupabaseDbService:
             self._score_region_cache[normalized_score_id] = []
             return []
 
-        top_k_edges = 15 if normalized_score_id == "pmat" else 30
+        top_k_edges = 30
         region_scores: Dict[str, float] = {}
         for edge in edge_candidates[:top_k_edges]:
             if not isinstance(edge, dict):

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { setAuthToken, removeAuthToken } from './api'
 import { AnalysisResponse, User as BaseUser } from './types'
@@ -9,7 +10,49 @@ interface User extends BaseUser {
 
 const AUTH_SESSION_DURATION_MS = 60 * 60 * 1000
 const AUTH_EXPIRES_AT_KEY = 'auth_expires_at'
+const DEFAULT_AUTH_REDIRECT_PATH = '/dashboard'
+const DEPLOYED_AUTH_CALLBACK_ORIGIN = 'https://gnn-web.vercel.app'
 let authExpiryTimer: ReturnType<typeof setTimeout> | null = null
+
+function normalizeOrigin(origin: string) {
+  return new URL(origin).origin
+}
+
+function isDeployedOrigin(origin: string) {
+  return normalizeOrigin(origin) === normalizeOrigin(DEPLOYED_AUTH_CALLBACK_ORIGIN)
+}
+
+function normalizeAppRedirectPath(redirectTo = DEFAULT_AUTH_REDIRECT_PATH) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+
+  try {
+    const url = new URL(redirectTo, origin)
+    if (url.origin !== origin) {
+      return DEFAULT_AUTH_REDIRECT_PATH
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`
+  } catch {
+    return DEFAULT_AUTH_REDIRECT_PATH
+  }
+}
+
+function buildSignupEmailRedirectTo(redirectTo?: string) {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  const signupOrigin = window.location.origin
+  const isDeployedSignup = isDeployedOrigin(signupOrigin)
+  const callbackOrigin = isDeployedSignup ? signupOrigin : DEPLOYED_AUTH_CALLBACK_ORIGIN
+  const callbackUrl = new URL('/auth/callback', callbackOrigin)
+  callbackUrl.searchParams.set('from', normalizeAppRedirectPath(redirectTo))
+  if (!isDeployedSignup) {
+    callbackUrl.searchParams.set('source', 'non-deployed')
+    callbackUrl.searchParams.set('signup_origin', signupOrigin)
+  }
+  return callbackUrl.toString()
+}
 
 // Helper to set auth cookie for middleware
 function setAuthCookie(token: string, maxAgeSeconds = 60 * 60) {
@@ -55,9 +98,10 @@ function getRemainingSessionSeconds() {
 interface AuthStore {
   user: User | null
   loading: boolean
-  signup: (email: string, password: string) => Promise<boolean>
+  signup: (email: string, password: string, redirectTo?: string) => Promise<boolean>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  completeAuthSession: (session: Session) => void
   setUser: (user: User | null) => void
   restoreSession: () => Promise<void>
 }
@@ -78,32 +122,44 @@ export const useAuthStore = create<AuthStore>((set) => {
     }, maxAgeSeconds)
   }
 
+  const completeAuthSession = (session: Session) => {
+    const token = session.access_token
+    if (!token) {
+      throw new Error('Missing Supabase session token')
+    }
+
+    setAuthExpiry()
+    setAuthToken(token)
+    setAuthCookie(token)
+    scheduleLogout()
+    set({
+      loading: false,
+      user: {
+        id: session.user.id,
+        email: session.user.email || '',
+        access_token: token,
+      },
+    })
+  }
+
   return {
     user: null,
     // Start in loading state so protected routes wait for session restore on first paint.
     loading: true,
 
-    signup: async (email: string, password: string) => {
+    signup: async (email: string, password: string, redirectTo?: string) => {
       set({ loading: true })
       try {
+        const emailRedirectTo = buildSignupEmailRedirectTo(redirectTo)
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
         })
         if (error) throw error
         const token = data.session?.access_token
-        if (token) {
-          setAuthExpiry()
-          setAuthToken(token)
-          setAuthCookie(token)
-          scheduleLogout()
-          set({
-            user: {
-              id: data.user?.id || '',
-              email,
-              access_token: token,
-            },
-          })
+        if (token && data.session) {
+          completeAuthSession(data.session)
           return true
         }
 
@@ -144,6 +200,8 @@ export const useAuthStore = create<AuthStore>((set) => {
     },
 
     logout: expireSession,
+
+    completeAuthSession,
 
     setUser: (user) => set({ user }),
 

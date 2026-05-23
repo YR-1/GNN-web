@@ -32,7 +32,7 @@ function SignupForm() {
     setError('')
 
     try {
-      const hasSession = await signup(email, password)
+      const hasSession = await signup(email, password, redirectTo)
       if (hasSession) {
         router.push(redirectTo)
         return
@@ -57,13 +57,13 @@ function SignupForm() {
                 <div className='mb-0 flex items-center justify-center'>
                   <Image src='/fyp-logo.png' alt='MindPulse' width={100} height={100} className='rounded-xl' />
                 </div>
-                <h1 className='font-display text-3xl text-ink-950 text-center'>Account Created</h1>
+                <h1 className='font-display text-3xl text-ink-950 text-center'>Waiting for Verification</h1>
                 <p className='section-subtitle text-center mt-2'>
-                  Verify your email, then sign in to continue.
+                  We sent a confirmation link to {email}. Open the email and click the link to verify your account.
                 </p>
-                <button type='button' className='btn-primary w-full mt-6' onClick={() => router.push(`/login?from=${encodeURIComponent(redirectTo)}`)}>
-                  Go to Sign In
-                </button>
+                <p className='text-xs text-ink-700 text-center mt-2'>
+                  After verification, we will bring you back to sign in.
+                </p>
                 <div className='mt-6'>
                   <BackButton fallbackHref={redirectTo} className='w-full' />
                 </div>

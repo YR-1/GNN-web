@@ -16,6 +16,7 @@ export interface DocSection {
 export const DOC_SECTIONS: DocSection[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'how-it-works', label: 'How It Works' },
+  { id: 'models', label: 'Models' },
   { id: 'getting-started', label: 'Getting Started' },
   { id: 'data-format', label: 'Data Format' },
   { id: 'brain-atlas', label: 'Brain Atlas & Networks' },

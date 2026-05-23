@@ -22,9 +22,7 @@ type ToastState = {
   tone: 'success' | 'error' | 'danger'
 }
 
-type HistoryRow = HistoryItem & {
-  isSample?: boolean
-}
+type HistoryRow = HistoryItem
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All Statuses' },
@@ -32,37 +30,6 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'processing', label: 'Processing' },
   { value: 'failed', label: 'Failed' },
   { value: 'queued', label: 'Queued' },
-]
-
-const SAMPLE_HISTORY: HistoryRow[] = [
-  {
-    upload_id: 'sample-01',
-    file_name: 'resting_state_subject_018.nii.gz',
-    uploaded_at: '2026-05-11T08:45:00.000Z',
-    status: 'completed',
-    isSample: true,
-  },
-  {
-    upload_id: 'sample-02',
-    file_name: 'shen268_timeseries_session_a.txt',
-    uploaded_at: '2026-05-10T15:30:00.000Z',
-    status: 'completed',
-    isSample: true,
-  },
-  {
-    upload_id: 'sample-03',
-    file_name: 'functional_connectivity_batch_07.csv',
-    uploaded_at: '2026-05-09T11:20:00.000Z',
-    status: 'completed',
-    isSample: true,
-  },
-  {
-    upload_id: 'sample-04',
-    file_name: 'subject_memory_network.mat',
-    uploaded_at: '2026-05-08T06:10:00.000Z',
-    status: 'processing',
-    isSample: true,
-  },
 ]
 
 const statusDotClass: Record<HistoryStatus, string> = {
@@ -367,7 +334,6 @@ export default function HistoryPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [downloading, setDownloading] = useState(false)
-  const [showSampleRows, setShowSampleRows] = useState(false)
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -375,7 +341,6 @@ export default function HistoryPage() {
         const response = await api.getHistory()
         const rows = response.data as HistoryItem[]
         setHistory(rows)
-        setShowSampleRows(rows.length === 0)
       } catch (err: any) {
         if (err?.response?.status === 403 || err?.response?.status === 401) {
           router.push('/login')
@@ -391,9 +356,8 @@ export default function HistoryPage() {
   }, [router])
 
   const rows = useMemo<HistoryRow[]>(() => {
-    const baseRows = history.length > 0 ? history : showSampleRows ? SAMPLE_HISTORY : []
-    return baseRows
-  }, [history, showSampleRows])
+    return history
+  }, [history])
 
   const filteredHistory = useMemo(() => {
     let items = rows
@@ -489,7 +453,7 @@ export default function HistoryPage() {
       tone: 'danger',
     })
 
-    const realIds = selectedRows.filter((item) => !item.isSample).map((item) => item.upload_id)
+    const realIds = selectedRows.map((item) => item.upload_id)
     if (realIds.length === 0) {
       return
     }
@@ -536,7 +500,7 @@ export default function HistoryPage() {
       const exportFiles = await Promise.all(
         selectedRows.map(async (item) => {
           let analysis: AnalysisResponse | null = null
-          if (!item.isSample && item.execution_id) {
+          if (item.execution_id) {
             try {
               const response = await api.getAnalysis(item.execution_id)
               analysis = response.data as AnalysisResponse
@@ -657,12 +621,6 @@ export default function HistoryPage() {
         </div>
       </section>
 
-      {!loading && history.length === 0 ? (
-        <div className='rounded-2xl border border-indigo-200/80 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900'>
-          Showing sample files until your first upload arrives.
-        </div>
-      ) : null}
-
       {error ? (
         <div className='status-banner status-banner-error'>
           <p>{error}</p>
@@ -755,14 +713,14 @@ export default function HistoryPage() {
                 {filteredHistory.length === 0 ? (
                   <tr>
                     <td colSpan={4} className='px-6 py-14 text-center text-sm text-slate-500'>
-                      No files match your current filters.
+                      {history.length === 0 ? 'No uploaded files yet.' : 'No files match your current filters.'}
                     </td>
                   </tr>
                 ) : (
                   filteredHistory.map((item) => {
                     const itemStatus = normalizeStatus(item.status)
                     const isSelected = selectedIds.includes(item.upload_id)
-                    const canOpenAnalysis = item.status === 'completed' && Boolean(item.execution_id) && !item.isSample
+                    const canOpenAnalysis = item.status === 'completed' && Boolean(item.execution_id)
                     const isAnalysisLoading = item.execution_id ? analysisLoading[item.execution_id] : false
 
                     return (
@@ -792,7 +750,6 @@ export default function HistoryPage() {
 
                               <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500'>
                                 {item.execution_id ? <span className='mono-data'>ID: {item.execution_id}</span> : null}
-                                {item.isSample ? <span>Sample dataset</span> : null}
                               </div>
                             </div>
                           </div>
@@ -813,7 +770,7 @@ export default function HistoryPage() {
                           <button
                             type='button'
                             onClick={() => {
-                              if (item.status === 'completed' && item.execution_id && !item.isSample) {
+                              if (item.status === 'completed' && item.execution_id) {
                                 void activateAnalysis(item.execution_id)
                                 return
                               }
@@ -827,7 +784,7 @@ export default function HistoryPage() {
                             }}
                             className='inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700'
                             title={
-                              item.status === 'completed' && item.execution_id && !item.isSample
+                              item.status === 'completed' && item.execution_id
                                 ? 'Open analysis'
                                 : item.status === 'failed' && item.execution_id
                                   ? 'Retry analysis'
@@ -851,7 +808,7 @@ export default function HistoryPage() {
               <Link href='/upload' className='font-semibold text-indigo-700 hover:text-indigo-800'>
                 upload page
               </Link>{' '}
-              to replace the sample records with your own history.
+              to start building your analysis history.
             </div>
           ) : null}
         </section>

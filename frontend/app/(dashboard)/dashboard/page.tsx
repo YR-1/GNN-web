@@ -187,6 +187,13 @@ function formatMetricValue(metric: DashboardMetric, value: number): string {
   return Math.round(value).toString()
 }
 
+function formatHistogramRange(metric: DashboardMetric, start: number, end: number, isLastBin: boolean): string {
+  const lower = formatMetricValue(metric, start)
+  const upperBound = isLastBin ? end : end - 1
+  const upper = formatMetricValue(metric, upperBound)
+  return `${lower} to ${upper}`
+}
+
 function quantile(values: number[], percentile: number): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -206,15 +213,16 @@ function buildHistogram(metric: DashboardMetric): HistogramBin[] {
   const bins = Array.from({ length: binCount }, (_, index) => {
     const start = min + index * width
     const end = Math.min(max, start + width)
+    const isLastBin = index === binCount - 1
     const inBin = values.filter((value) => {
-      if (index === binCount - 1) return value >= start && value <= end
+      if (isLastBin) return value >= start && value <= end
       return value >= start && value < end
     })
     return {
       x: start + width / 2,
       count: inBin.length,
       percentile: `${Math.round(((index + 1) / binCount) * 100)}th`,
-      rangeText: `${formatMetricValue(metric, start)} to ${formatMetricValue(metric, end)}`,
+      rangeText: formatHistogramRange(metric, start, end, isLastBin),
     }
   })
   return bins
@@ -323,16 +331,13 @@ function BoxplotStrip({ metric }: { metric: DashboardMetric }) {
 
   return (
     <div className='rounded-[1.15rem] border border-slate-200/80 bg-white/78 p-2.5 shadow-sm'>
-      <div className='mb-1.5 flex items-start justify-between gap-2.5'>
+      <div className='mb-1.5'>
         <div>
           <p className='text-[12px] font-semibold text-slate-950'>{metric.label}</p>
           <p className='text-[11px] text-slate-500'>
             {formatMetricValue(metric, metric.range[0])} - {formatMetricValue(metric, metric.range[1])}
           </p>
         </div>
-        <span className='rounded-full px-2 py-1 text-[10px] font-semibold' style={{ color: metric.accent, background: metric.accentSoft }}>
-          {metric.reliability}
-        </span>
       </div>
 
       <div className='relative mt-3 h-9'>
@@ -686,7 +691,7 @@ export default function DashboardPage() {
           <section className='rounded-[1.5rem] border border-slate-200/80 bg-slate-50/75 p-3 shadow-sm'>
             <div className='mb-2.5 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between'>
               <div>
-                <h2 className='text-base font-semibold text-slate-950'>Longitudinal Distribution Metrics</h2>
+                <h2 className='text-base font-semibold text-slate-950'>Prediction Variability Analysis</h2>
     
               </div>
               <div className='flex flex-wrap gap-2 text-[11px] font-medium text-slate-600'>

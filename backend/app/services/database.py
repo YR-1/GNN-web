@@ -636,7 +636,7 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
     def op():
         metric_configs = {
             "listsort_ageadj": {
-                "label": "ListSort (Age Adjusted)",
+                "label": "ListSort (Working Memory)",
                 "shortLabel": "ListSort",
                 "range": [50.0, 150.0],
                 "defaultInsight": "Working-memory prediction is driven by frontoparietal coordination across the cohort.",
@@ -654,9 +654,9 @@ async def get_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "defaultInsight": "Picture-sequence memory patterns reflect distributed episodic-memory and associative network coordination.",
             },
             "emotsupp_unadj": {
-                "label": "EmotSupp (Emotional Support)",
+                "label": "Emotional Support (Empathy & Caring)",
                 "shortLabel": "EmotSupp",
-                "range": [0.0, 100.0],
+                "range": [20.0, 80.0],
                 "defaultInsight": "Perceived emotional support reflects default-mode and limbic coordination.",
             },
             "psqi": {

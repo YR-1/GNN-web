@@ -52,7 +52,7 @@ type HistogramBin = {
 const DASHBOARD_METRICS: DashboardMetric[] = [
   {
     id: 'listsort_ageadj',
-    label: 'ListSort (Age Adjusted)',
+    label: 'ListSort (Working Memory)',
     shortLabel: 'ListSort',
     range: [50, 150],
     average: 108,
@@ -124,9 +124,9 @@ const DASHBOARD_METRICS: DashboardMetric[] = [
   },
   {
     id: 'emotsupp_unadj',
-    label: 'EmotSupp (Emotional Support)',
+    label: 'Emotional Support (Empathy & Caring)',
     shortLabel: 'EmotSupp',
-    range: [0, 100],
+    range: [20, 80],
     average: 54,
     summaryStd: 0.38,
     summaryVariance: 0.14,

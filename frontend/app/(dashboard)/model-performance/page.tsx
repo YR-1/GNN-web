@@ -13,7 +13,7 @@ type SortDirection = 'asc' | 'desc' | null
 const ARCHITECTURE_COLORS: Record<string, string> = {
   FBNetGen: '#6366f1',
   BrainGNN: '#a855f7',
-  GAT: '#0d9488',
+  'T-RegGNN': '#0d9488',
 }
 
 const CONSISTENT_SCORE_LABELS: Record<string, string> = {
@@ -24,11 +24,18 @@ const CONSISTENT_SCORE_LABELS: Record<string, string> = {
   psqi: 'PSQI (Sleep Quality)',
 }
 
+const CONSISTENT_MODEL_ARCHITECTURES: Record<string, string> = {
+  pmat: 'BrainGNN',
+  emotsupp_unadj: 'T-RegGNN',
+  psqi: 'T-RegGNN',
+}
+
 const getArchitectureColor = (architecture: string) => ARCHITECTURE_COLORS[architecture] ?? '#64748b'
 
 const normalizePerformanceRow = (row: ModelPerformance): ModelPerformance => ({
   ...row,
   behavioralScore: CONSISTENT_SCORE_LABELS[row.id] ?? row.behavioralScore,
+  gnnArchitecture: CONSISTENT_MODEL_ARCHITECTURES[row.id] ?? row.gnnArchitecture,
 })
 
 export default function ModelPerformancePage() {
@@ -97,10 +104,9 @@ export default function ModelPerformancePage() {
   }
 
   const getBarColor = (correlation: number) => {
-    if (correlation >= 0.85) return '#059669'
-    if (correlation >= 0.75) return '#3b82f6'
-    if (correlation >= 0.65) return '#f59e0b'
-    return '#ef4444'
+    if (correlation >= 0.3) return '#059669'
+    if (correlation >= 0.2) return '#3b82f6'
+    return '#64748b'
   }
 
   return (
@@ -226,7 +232,7 @@ export default function ModelPerformancePage() {
                     {model.pValue < 0.001 ? '< 0.001' : model.pValue.toFixed(5)}
                   </TableCell>
                   <TableCell className='px-4 py-3 text-right text-slate-700 font-mono text-sm'>
-                    {model.mse.toFixed(2)}
+                    {model.mse.toFixed(4)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -240,8 +246,8 @@ export default function ModelPerformancePage() {
             <div className='rounded-lg border border-slate-200 bg-white p-3'>
               <dt className='text-xs font-semibold text-slate-800'>Correlation (r)</dt>
               <dd className='mt-1 text-xs leading-relaxed text-slate-600'>
-                How closely predicted scores track the actual scores across subjects. Ranges 0 to 1
-                &mdash; higher means stronger agreement.
+                How closely predicted scores track the actual scores across subjects. In fMRI
+                brain-behavior prediction, r values above 0.3 can indicate a meaningful signal.
               </dd>
             </div>
             <div className='rounded-lg border border-slate-200 bg-white p-3'>
@@ -262,22 +268,18 @@ export default function ModelPerformancePage() {
 
           <div className='mt-4 border-t border-slate-200 pt-3'>
             <p className='text-xs font-semibold text-slate-800'>Correlation strength</p>
-            <div className='mt-2 grid grid-cols-2 gap-3 text-xs md:grid-cols-4'>
+            <div className='mt-2 grid gap-3 text-xs sm:grid-cols-3'>
               <div className='flex items-center gap-2'>
                 <div className='w-3 h-3 rounded' style={{ backgroundColor: '#059669' }} />
-                <span className='text-slate-600'>Excellent (r &gt;= 0.85)</span>
+                <span className='text-slate-600'>Meaningful signal (r &gt;= 0.30)</span>
               </div>
               <div className='flex items-center gap-2'>
                 <div className='w-3 h-3 rounded' style={{ backgroundColor: '#3b82f6' }} />
-                <span className='text-slate-600'>Good (r &gt;= 0.75)</span>
+                <span className='text-slate-600'>Weak signal (r &gt;= 0.20)</span>
               </div>
               <div className='flex items-center gap-2'>
-                <div className='w-3 h-3 rounded' style={{ backgroundColor: '#f59e0b' }} />
-                <span className='text-slate-600'>Moderate (r &gt;= 0.65)</span>
-              </div>
-              <div className='flex items-center gap-2'>
-                <div className='w-3 h-3 rounded' style={{ backgroundColor: '#ef4444' }} />
-                <span className='text-slate-600'>Fair (r &lt; 0.65)</span>
+                <div className='w-3 h-3 rounded' style={{ backgroundColor: '#64748b' }} />
+                <span className='text-slate-600'>Limited signal (r &lt; 0.20)</span>
               </div>
             </div>
           </div>

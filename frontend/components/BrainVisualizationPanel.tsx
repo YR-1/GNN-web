@@ -1,17 +1,19 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SCORE_CATEGORIES, SCORE_REGISTRY, getScoresByCategory, ScoreDefinition } from '@/lib/score-registry'
 import { SimulatedScoreResult } from '@/lib/score-simulator'
 import { computeScoreTopLinks } from '@/lib/score-links'
 import { ConnectomeLink } from '@/lib/types'
 import { getROIInfo } from '@/lib/shen268-labels'
+import { LazyImportanceBrain } from '@/components/LazyImportanceBrain'
 
 interface BrainVisualizationPanelProps {
   predictedValues: Record<string, SimulatedScoreResult>
   correlationMatrix: number[][]
   connectomeHtml?: string | null
   importanceBrainUrl?: string | null
+  importanceStaticBrainUrl?: string | null
   selectedScoreId: string | null
   onSelectScore: (scoreId: string) => void
 }
@@ -46,23 +48,69 @@ const linkBadgeClass = (link: ConnectomeLink) =>
     ? 'bg-rose-100 text-rose-800 border-rose-300/70'
     : 'bg-blue-100 text-blue-800 border-blue-300/70'
 
+function ScoreInfoTooltip({ score }: { score: ScoreDefinition }) {
+  return (
+    <span className='group relative inline-flex'>
+      <span
+        className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-brand-400/25 bg-white text-[11px] font-bold text-ink-700 shadow-sm transition hover:border-brand-500/50 hover:text-ink-950'
+        aria-label={`Information about ${score.name}`}
+        tabIndex={0}
+      >
+        i
+      </span>
+      <span className='pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-[min(22rem,80vw)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-relaxed text-slate-700 shadow-xl group-hover:inline-block group-focus-within:inline-block'>
+        <span className='block text-sm font-semibold text-slate-950'>{score.name}</span>
+        {score.domain ? (
+          <span className='mt-2 block'>
+            <span className='font-semibold text-slate-950'>Area: </span>
+            {score.domain}
+          </span>
+        ) : null}
+        {score.construct ? (
+          <span className='mt-1.5 block'>
+            <span className='font-semibold text-slate-950'>Measures: </span>
+            {score.construct}
+          </span>
+        ) : null}
+        {score.measureName ? (
+          <span className='mt-1.5 block'>
+            <span className='font-semibold text-slate-950'>Full measure: </span>
+            {score.measureName}
+          </span>
+        ) : null}
+        {score.detail ? <span className='mt-2 block text-slate-600'>{score.detail}</span> : null}
+        {score.interpretation ? (
+          <span className='mt-3 block rounded-xl bg-slate-50 p-3'>
+            <span className='font-semibold text-slate-950'>How to read it: </span>
+            {score.interpretation}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  )
+}
+
 export default function BrainVisualizationPanel({
   predictedValues,
   correlationMatrix,
   connectomeHtml,
   importanceBrainUrl,
+  importanceStaticBrainUrl,
   selectedScoreId,
   onSelectScore,
 }: BrainVisualizationPanelProps) {
   const [topK, setTopK] = useState(10)
   const [minR, setMinR] = useState(0)
   const [showDetails, setShowDetails] = useState(false)
-  const [loadedImportanceBrainUrl, setLoadedImportanceBrainUrl] = useState<string | null>(null)
 
   const selectedScore = useMemo(
-    () => SCORE_REGISTRY.find((s) => s.id === selectedScoreId) ?? null,
+    () =>
+      SCORE_REGISTRY.find((s) => s.id === selectedScoreId) ??
+      SCORE_REGISTRY.find((s) => s.id === 'listsort_ageadj') ??
+      null,
     [selectedScoreId]
   )
+  const effectiveSelectedScoreId = selectedScore?.id ?? null
 
   const topLinks = useMemo(() => {
     if (!selectedScore) return []
@@ -81,11 +129,6 @@ export default function BrainVisualizationPanel({
 
   const result = selectedScore ? predictedValues[selectedScore.id] : null
   const showImportanceBrain = Boolean(importanceBrainUrl)
-  const isImportanceBrainLoading = showImportanceBrain && importanceBrainUrl !== loadedImportanceBrainUrl
-
-  useEffect(() => {
-    setLoadedImportanceBrainUrl(null)
-  }, [importanceBrainUrl])
 
   return (
     <div className='surface-card space-y-3'>
@@ -101,7 +144,7 @@ export default function BrainVisualizationPanel({
               </span>
               {scores.map((scoreDef) => {
                 const sv = predictedValues[scoreDef.id]
-                const isActive = selectedScoreId === scoreDef.id
+                const isActive = effectiveSelectedScoreId === scoreDef.id
                 return (
                   <button
                     key={scoreDef.id}
@@ -118,6 +161,7 @@ export default function BrainVisualizationPanel({
                       style={{ background: scoreDef.accentColor }}
                     />
                     <span>{scoreDef.shortName}</span>
+                    <ScoreInfoTooltip score={scoreDef} />
                     {sv && (
                       <>
                         <span className='font-semibold' style={{ color: scoreDef.accentColor }}>
@@ -138,32 +182,37 @@ export default function BrainVisualizationPanel({
 
       {/* Selected score summary */}
       {selectedScore && result && (
-        <div className='flex items-baseline justify-between border-t border-brand-400/10 pt-2'>
-          <div>
-            <p className='text-sm font-semibold text-ink-950'>{selectedScore.name}</p>
-            <p className='text-[11px] text-ink-600'>{selectedScore.description}</p>
-            <p className='mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-600'>
-              <span className={`rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide ${sourceBadgeClass(result.source)}`}>
-                {result.source === 'model' ? 'Model prediction' : 'Simulated fallback'}
+        <div className='border-t border-brand-400/10 pt-2'>
+          <div className='flex items-baseline justify-between gap-3'>
+            <div>
+              <div className='group flex items-center gap-2'>
+                <p className='text-sm font-semibold text-ink-950'>{selectedScore.name}</p>
+                <ScoreInfoTooltip score={selectedScore} />
+              </div>
+              <p className='text-[11px] text-ink-600'>{selectedScore.description}</p>
+              <p className='mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-600'>
+                <span className={`rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide ${sourceBadgeClass(result.source)}`}>
+                  {result.source === 'model' ? 'Model prediction' : 'Simulated fallback'}
+                </span>
+                {result.modelFile && <span>File: {result.modelFile}</span>}
+                {result.modelArchitecture && <span>Architecture: {result.modelArchitecture}</span>}
+                {result.nGraphWindows && <span>Windows: {result.nGraphWindows}</span>}
+                {result.normalizedValue !== undefined && result.valueScale === 'original' && (
+                  <span>Normalized: {result.normalizedValue.toFixed(3)}</span>
+                )}
+              </p>
+            </div>
+            <div className='text-right shrink-0'>
+              <span className='text-xl font-semibold' style={{ color: selectedScore.accentColor }}>
+                {formatPredictionValue(result.value, selectedScore, result.valueScale)}
               </span>
-              {result.modelFile && <span>File: {result.modelFile}</span>}
-              {result.modelArchitecture && <span>Architecture: {result.modelArchitecture}</span>}
-              {result.nGraphWindows && <span>Windows: {result.nGraphWindows}</span>}
-              {result.normalizedValue !== undefined && result.valueScale === 'original' && (
-                <span>Normalized: {result.normalizedValue.toFixed(3)}</span>
-              )}
-            </p>
-          </div>
-          <div className='text-right shrink-0'>
-            <span className='text-xl font-semibold' style={{ color: selectedScore.accentColor }}>
-              {formatPredictionValue(result.value, selectedScore, result.valueScale)}
-            </span>
-            <span className='text-xs text-ink-600 ml-1'>
-              {formatPredictionUnit(selectedScore, result.valueScale)}
-            </span>
-            <p className='text-[10px] text-ink-600'>
-              95% CI: {formatPredictionValue(result.ci95Lower, selectedScore, result.valueScale)} - {formatPredictionValue(result.ci95Upper, selectedScore, result.valueScale)}
-            </p>
+              <span className='text-xs text-ink-600 ml-1'>
+                {formatPredictionUnit(selectedScore, result.valueScale)}
+              </span>
+              <p className='text-[10px] text-ink-600'>
+                95% CI: {formatPredictionValue(result.ci95Lower, selectedScore, result.valueScale)} - {formatPredictionValue(result.ci95Upper, selectedScore, result.valueScale)}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -171,24 +220,12 @@ export default function BrainVisualizationPanel({
       {/* 3D Connectome */}
       <div className='rounded-xl border border-brand-400/20 bg-white/82 overflow-hidden'>
         {showImportanceBrain && importanceBrainUrl ? (
-          <div className='relative h-[500px]'>
-            {isImportanceBrainLoading && (
-              <div className='absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-ink-700'>
-                <div className='text-center'>
-                  <div className='loading-spinner mx-auto mb-3' />
-                  <p>Loading selected brain plot...</p>
-                </div>
-              </div>
-            )}
-            <iframe
-              title={`Global ${selectedScore?.shortName ?? 'score'} model importance brain`}
-              src={importanceBrainUrl}
-              onLoad={() => setLoadedImportanceBrainUrl(importanceBrainUrl)}
-              className={`h-full w-full border-0 transition-opacity ${isImportanceBrainLoading ? 'opacity-0' : 'opacity-100'}`}
-              loading='lazy'
-              sandbox='allow-scripts allow-same-origin'
-            />
-          </div>
+          <LazyImportanceBrain
+            interactiveUrl={importanceBrainUrl}
+            staticUrl={importanceStaticBrainUrl}
+            title={`Global ${selectedScore?.shortName ?? 'score'} model importance brain`}
+            className='h-[500px]'
+          />
         ) : connectomeHtml ? (
           <iframe
             title={`Connectome for ${selectedScore?.shortName ?? 'brain'}`}

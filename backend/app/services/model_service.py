@@ -1332,6 +1332,7 @@ def _build_results_payload(
         "graph_window_wsize": DEFAULT_WSIZE,
         "graph_window_shift": DEFAULT_SHIFT,
     }
+    top_signal_roi_indices = np.argsort(np.nan_to_num(np.std(ts, axis=0), nan=0.0))[-min(5, int(n_rois)):][::-1]
 
     try:
         graph_payload = _convert_timeseries_to_graph_windows(

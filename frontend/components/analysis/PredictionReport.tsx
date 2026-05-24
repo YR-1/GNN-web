@@ -1,13 +1,14 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { AnalysisResponse, CorrelationResults } from '@/lib/types'
 import { SCORE_REGISTRY } from '@/lib/score-registry'
 import { simulateScore, SimulatedScoreResult } from '@/lib/score-simulator'
 import { BoldTimeSeries } from '@/components/charts/BoldTimeSeries'
 import { API_BASE_URL } from '@/lib/api'
 import { useAnalysisStore } from '@/lib/store'
+import { loadPlotly } from '@/lib/load-plotly'
 
 const BrainVisualizationPanel = dynamic(() => import('@/components/BrainVisualizationPanel'), { ssr: false })
 const StaticBrainViews = dynamic(() => import('@/components/StaticBrainViews'), { ssr: false })
@@ -177,6 +178,10 @@ export function PredictionReport({
     return withAssetVersion(toBackendUrl(path))
   }, [results?.importance_static_brain_urls, results?.listsort_importance_static_brain_url, selectedScore])
 
+  useEffect(() => {
+    if (results?.time_series) void loadPlotly()
+  }, [results?.time_series])
+
   if (analysis.status !== 'completed') {
     return (
       <div className='status-banner status-banner-warning'>
@@ -226,7 +231,8 @@ export function PredictionReport({
           correlationMatrix={results.correlation_matrix}
           connectomeHtml={results.nilearn_connectome_html}
           importanceBrainUrl={selectedImportanceBrainUrl}
-          selectedScoreId={selectedScoreId}
+          importanceStaticBrainUrl={selectedImportanceStaticBrainUrl}
+          selectedScoreId={selectedScore?.id ?? null}
           onSelectScore={setSelectedScoreId}
         />
 

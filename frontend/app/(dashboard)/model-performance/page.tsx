@@ -42,7 +42,6 @@ export default function ModelPerformancePage() {
   const [performanceData, setPerformanceData] = useState<ModelPerformance[]>(
     modelPerformanceData.map(normalizePerformanceRow)
   )
-  const [loadingData, setLoadingData] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
@@ -56,8 +55,6 @@ export default function ModelPerformancePage() {
         }
       } catch (error) {
         setLoadError('Unable to load model performance from backend. Showing local fallback data.')
-      } finally {
-        setLoadingData(false)
       }
     }
 
@@ -129,13 +126,6 @@ export default function ModelPerformancePage() {
         {loadError && (
           <div className='status-banner status-banner-warning mb-4'>
             <p>{loadError}</p>
-          </div>
-        )}
-
-        {loadingData && (
-          <div className='text-center py-6'>
-            <div className='loading-spinner mx-auto mb-3' />
-            <p className='text-ink-800 text-sm'>Loading model performance...</p>
           </div>
         )}
 

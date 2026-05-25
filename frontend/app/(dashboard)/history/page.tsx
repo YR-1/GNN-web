@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, ArrowUpDown, Check, ChevronDown, Download, MoreVertical, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpDown, Check, ChevronDown, Download, Search, Trash2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { AnalysisResponse, HistoryItem } from '@/lib/types'
 import { useAnalysisStore } from '@/lib/store'
@@ -767,32 +767,33 @@ export default function HistoryPage() {
                         </td>
 
                         <td className='border-b border-slate-100 px-6 py-5 text-right'>
-                          <button
-                            type='button'
-                            onClick={() => {
-                              if (item.status === 'completed' && item.execution_id) {
-                                void activateAnalysis(item.execution_id)
-                                return
-                              }
-                              if (item.status === 'failed' && item.execution_id) {
-                                void api.retryAnalysis(item.execution_id)
+                          {item.status === 'completed' && item.execution_id ? (
+                            <button
+                              type='button'
+                              onClick={() => void activateAnalysis(item.execution_id!)}
+                              className='inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900'
+                              title='Open analysis'
+                            >
+                              View
+                            </button>
+                          ) : item.status === 'failed' && item.execution_id ? (
+                            <button
+                              type='button'
+                              onClick={() => {
+                                void api.retryAnalysis(item.execution_id!)
                                   .then(() => router.push(`/analysis/${item.execution_id}/loading`))
                                   .catch((retryErr: any) => {
                                     setError(retryErr?.response?.data?.detail || 'Retry failed.')
                                   })
-                              }
-                            }}
-                            className='inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700'
-                            title={
-                              item.status === 'completed' && item.execution_id
-                                ? 'Open analysis'
-                                : item.status === 'failed' && item.execution_id
-                                  ? 'Retry analysis'
-                                  : 'More actions'
-                            }
-                          >
-                            <MoreVertical className='h-4 w-4' />
-                          </button>
+                              }}
+                              className='inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900'
+                              title='Retry analysis'
+                            >
+                              Retry
+                            </button>
+                          ) : (
+                            <span className='text-sm text-slate-400'>-</span>
+                          )}
                         </td>
                       </tr>
                     )

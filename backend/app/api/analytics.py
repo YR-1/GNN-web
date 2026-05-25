@@ -44,8 +44,8 @@ MODEL_PERFORMANCE_SEEDS = [
     ("listsort_ageadj", "ListSort (Working Memory)", "FBNetGen", 0.3736, 0.0009, 0.9414, 1.2),
     ("pmat", "PMAT (Fluid Intelligence)", "BrainGNN", 0.3893, 0.0172, 19.6051, 2.4),
     ("picseq", "PicSeq (Picture Sequence Memory)", "FBNetGen", 0.3250, 0.0009, 1.1818, 3.1),
-    ("emotsupp_unadj", "Emotional Support (Empathy & Caring)", "T-RegGNN", 0.769, 0.00215, 4.85, 5.4),
-    ("psqi", "PSQI (Sleep Quality)", "T-RegGNN", 0.747, 0.00301, 5.13, 6.2),
+    ("emotsupp_unadj", "Emotional Support (Empathy & Caring)", "T-RegGNN", 0.3465, 0.0111, 7.5502, 5.4),
+    ("psqi", "PSQI (Sleep Quality)", "T-RegGNN", 0.2220, 0.134, 1.9626, 6.2),
 ]
 
 

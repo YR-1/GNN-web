@@ -13,7 +13,11 @@ export default function RootPage() {
         <div className='max-w-7xl mx-auto px-6 py-20 relative'>
           <div className='max-w-4xl mx-auto text-center'>
             <div className='mb-8 flex justify-center'>
-              <div className='inline-flex items-center justify-center gap-4 px-2 py-2'>
+              <Link
+                href='/login'
+                className='inline-flex items-center justify-center gap-4 px-2 py-2'
+                aria-label='Go to Get Started page'
+              >
                 <Image
                   src='/fyp-logo-brain.png'
                   alt='MindPulse logo'
@@ -24,7 +28,7 @@ export default function RootPage() {
                 <span className='font-display text-3xl font-bold leading-none text-ink-950 sm:text-5xl'>
                   MindPulse
                 </span>
-              </div>
+              </Link>
             </div>
             <h1 className='text-4xl sm:text-5xl font-display font-bold text-ink-950 mb-6'>
               Predict Human Behavior from Brain Activity
@@ -179,7 +183,11 @@ export default function RootPage() {
         <div className='max-w-7xl mx-auto px-6'>
           <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
             <div>
-              <div className='flex items-center gap-2 mb-3'>
+              <Link
+                href='/login'
+                className='mb-3 flex items-center gap-2'
+                aria-label='Go to Get Started page'
+              >
                 <div className='w-8 h-8 rounded-lg flex items-center justify-center'>
                   
                   <Image
@@ -191,39 +199,53 @@ export default function RootPage() {
                 />
                 </div>
                 <span className='font-display font-semibold text-ink-950'>MindPulse</span>
-              </div>
+              </Link>
               <p className='text-sm text-ink-700'>
-                Advancing neuroscience through predictive modeling
+                Advancing neuroscience research through AI-powered behavioural prediction and brain connectivity analysis.
               </p>
+              <div className='mt-4'>
+                <p className='mb-2 text-sm font-semibold text-ink-950'>Socials</p>
+                <a
+                  href='https://github.com/YR-1/GNN-web'
+                  target='_blank'
+                  rel='noreferrer'
+                  className='text-sm text-ink-700 transition-colors hover:text-ink-950'
+                >
+                  GitHub
+                </a>
+              </div>
             </div>
 
             <div>
-              <h4 className='font-display font-semibold text-ink-950 mb-3'>Product</h4>
+              <h4 className='font-display font-semibold text-ink-950 mb-3'>Platform</h4>
               <ul className='space-y-2 text-sm text-ink-700'>
                 <li><a href='#' className='hover:text-ink-950 transition-colors'>Features</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Pricing</a></li>
+                <li><a href='#' className='hover:text-ink-950 transition-colors'>Visualizations</a></li>
+                <li><a href='#' className='hover:text-ink-950 transition-colors'>Prediction Pipeline</a></li>
+                <li><a href='#' className='hover:text-ink-950 transition-colors'>Brain Connectivity Analysis</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className='font-display font-semibold text-ink-950 mb-3'>Research</h4>
+              <ul className='space-y-2 text-sm text-ink-700'>
                 <li><a href='#' className='hover:text-ink-950 transition-colors'>Documentation</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>API</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className='font-display font-semibold text-ink-950 mb-3'>Resources</h4>
-              <ul className='space-y-2 text-sm text-ink-700'>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Tutorials</a></li>
                 <li><a href='#' className='hover:text-ink-950 transition-colors'>Research Papers</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Case Studies</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Support</a></li>
+                <li><a href='#' className='hover:text-ink-950 transition-colors'>Methodology</a></li>
+                <li><a href='#' className='hover:text-ink-950 transition-colors'>Dataset Information</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className='font-display font-semibold text-ink-950 mb-3'>Company</h4>
+              <h4 className='font-display font-semibold text-ink-950 mb-3'>Team</h4>
               <ul className='space-y-2 text-sm text-ink-700'>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>About</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Team</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Contact</a></li>
-                <li><a href='#' className='hover:text-ink-950 transition-colors'>Privacy</a></li>
+                <li><span className='text-ink-950'>Team Members</span></li>
+                <li><span>Ang Qiao Xin</span></li>
+                <li><span>Gan Ruiqi</span></li>
+                <li><span>Siau Jia Chien</span></li>
+                <li><span>Liew Yun Ru</span></li>
+                <li><span className='text-ink-950'>Supervisor</span></li>
+                <li><span>Ting Chee-Ming</span></li>
               </ul>
             </div>
           </div>

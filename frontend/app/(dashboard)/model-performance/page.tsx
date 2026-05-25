@@ -189,7 +189,7 @@ export default function ModelPerformancePage() {
                     onClick={() => handleSort('mse')}
                     className='hover:bg-blue-100 p-0 h-auto font-semibold flex items-center ml-auto'
                   >
-                    MSE
+                    MAE
                     {getSortIcon('mse')}
                   </Button>
                 </TableHead>
@@ -258,9 +258,9 @@ export default function ModelPerformancePage() {
               </dd>
             </div>
             <div className='rounded-lg border border-slate-200 bg-white p-3'>
-              <dt className='text-xs font-semibold text-slate-800'>MSE</dt>
+              <dt className='text-xs font-semibold text-slate-800'>MAE</dt>
               <dd className='mt-1 text-xs leading-relaxed text-slate-600'>
-                Mean Squared Error &mdash; the average squared gap between predicted and actual
+                Mean Absolute Error &mdash; the average absolute gap between predicted and actual
                 scores. Lower means more accurate predictions.
               </dd>
             </div>

@@ -1,13 +1,12 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAnalysisStore } from '@/lib/store'
 import { AnalysisResponse } from '@/lib/types'
 import { AnalysisLoadingGraphic } from '@/components/AnalysisLoadingGraphic'
-import React from 'react'
 
 type ExecutionStatusValue = 'queued' | 'processing' | 'completed' | 'failed'
 
@@ -39,12 +38,9 @@ const stepIndexByStatus: Record<ExecutionStatusValue, number> = {
   failed: 0,
 }
 
-export default function AnalysisLoadingPage({
-  params,
-}: {
-  params: Promise<{ executionId: string }>
-}) {
-  const { executionId } = React.use(params)
+export default function AnalysisLoadingPage() {
+  const params = useParams<{ executionId: string }>()
+  const executionId = params.executionId
   const router = useRouter()
   const searchParams = useSearchParams()
   const setActiveAnalysis = useAnalysisStore((state) => state.setActiveAnalysis)
@@ -101,6 +97,10 @@ export default function AnalysisLoadingPage({
 
   useEffect(() => {
     const pollStatus = async () => {
+      if (!executionId) {
+        setError('Missing analysis execution ID.')
+        return
+      }
       if (finishedRef.current || requestInFlightRef.current) return
       requestInFlightRef.current = true
 

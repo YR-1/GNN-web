@@ -34,7 +34,7 @@ export const modelPerformanceData: ModelPerformance[] = [
     gnnArchitecture: 'FBNetGen',
     correlation: 0.3736,
     pValue: 0.0009,
-    mse: 0.9414,
+    mse: 9.7145,
     scatterData: generateScatterData(1.2, 0.3736),
   },
   {
@@ -52,7 +52,7 @@ export const modelPerformanceData: ModelPerformance[] = [
     gnnArchitecture: 'FBNetGen',
     correlation: 0.325,
     pValue: 0.0009,
-    mse: 1.1818,
+    mse: 8.2255,
     scatterData: generateScatterData(3.1, 0.325),
   },
   {

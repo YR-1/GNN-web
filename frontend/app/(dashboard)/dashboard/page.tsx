@@ -229,6 +229,9 @@ function buildHistogram(metric: DashboardMetric): HistogramBin[] {
 }
 
 function getHistogramStep(metric: DashboardMetric): number {
+  if (metric.id === 'pmat') return 4
+  if (metric.id === 'psqi') return 3
+
   const [min, max] = metric.range
   const span = max - min
 

@@ -1417,6 +1417,28 @@ def _build_results_payload(
     return results, corr_matrix, plotly_json
 
 
+def _load_and_build_results_payload(
+    file_path: str,
+    *,
+    file_name: str,
+    file_size: int,
+) -> Tuple[Dict[str, Any], np.ndarray, Dict[str, Any], Dict[str, Any]]:
+    """
+    Run the synchronous, CPU-heavy analysis stage.
+
+    This is intentionally isolated so the async background task can offload it
+    to a worker thread and keep FastAPI responsive for status polling.
+    """
+    ts, preprocess_meta = _load_timeseries_file(file_path, expected_nrois=EXPECTED_NROIS)
+    results, corr_matrix, plotly_json = _build_results_payload(
+        ts,
+        file_name=file_name,
+        file_size=file_size,
+    )
+    results["preprocessing"] = preprocess_meta
+    return results, corr_matrix, plotly_json, preprocess_meta
+
+
 async def _run_single_pass_pipeline(
     file_path: str,
     execution_id: str,
@@ -1429,13 +1451,12 @@ async def _run_single_pass_pipeline(
         await asyncio.sleep(0.5)
         await set_execution_status(execution_id, user_id, "processing")
 
-        ts, preprocess_meta = _load_timeseries_file(file_path, expected_nrois=EXPECTED_NROIS)
-        results, corr_matrix, plotly_json = _build_results_payload(
-            ts,
+        results, corr_matrix, plotly_json, _ = await asyncio.to_thread(
+            _load_and_build_results_payload,
+            file_path,
             file_name=file_name,
             file_size=file_size,
         )
-        results["preprocessing"] = preprocess_meta
 
         await store_execution_results(execution_id, user_id, results, "completed")
 

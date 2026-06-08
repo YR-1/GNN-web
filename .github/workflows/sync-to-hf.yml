@@ -20,6 +20,21 @@ jobs:
           git lfs install
           git lfs pull
 
+      # Remove folders that should stay on GitHub but NOT be deployed to the
+      # Hugging Face Space. This makes a throwaway commit that is only ever
+      # force-pushed to HF below; it is never pushed back to GitHub, so the
+      # GitHub repo keeps these folders intact.
+      - name: Exclude non-runtime folders from HF mirror
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          for path in training; do
+            if [ -e "$path" ]; then
+              git rm -r --quiet "$path"
+            fi
+          done
+          git commit -m "Exclude non-runtime folders from Hugging Face Space" || echo "Nothing to exclude"
+
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}

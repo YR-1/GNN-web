@@ -25,6 +25,8 @@ MindPulse is a full-stack neuroimaging web app for uploading ROI time-series fil
 |-- backend/                 FastAPI app, model services, Supabase services
 |-- frontend/                Next.js app
 |-- notebooks/               Graph preprocessing imported by backend
+|-- training/                Model training code (kept on GitHub, not deployed to HF)
+|-- database/                SQL schema dump for Supabase
 |-- .github/workflows/       GitHub Actions automation
 |-- Dockerfile               Hugging Face Spaces backend image
 `-- .dockerignore            Backend image exclusions
@@ -47,6 +49,8 @@ The workflow at `.github/workflows/sync-to-hf.yml` pushes `main` to the Hugging 
 2. In the GitHub repo: **Settings → Secrets and variables → Actions → New secret**
 3. Name: `HF_TOKEN`, value: paste the token
 4. Push any commit to `main` — the Action runs automatically
+
+The workflow strips non-runtime folders (currently `training/`) before pushing, so they stay on GitHub but are never deployed to the Hugging Face Space.
 
 ## Local Setup
 
@@ -83,6 +87,15 @@ Frontend is available at `http://localhost:3000`.
 
 ## Environment Variables
 
+Template files are provided — copy each and fill in your own values:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.local.example frontend/.env.local
+```
+
+The real `.env` files are gitignored and must never be committed.
+
 ### backend/.env
 
 ```env
@@ -109,7 +122,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 ## Supabase Setup
 
-Create a Supabase project, enable email/password auth, then run the SQL below in the Supabase SQL Editor for a fresh database.
+Create a Supabase project, enable email/password auth, then run [`database/schema.sql`](database/schema.sql) in the Supabase SQL Editor for a fresh database.
 
 Create a public Supabase Storage bucket named:
 
@@ -118,194 +131,6 @@ roi-analysis
 ```
 
 The backend writes correlation graphs and matrices to this bucket through `backend/app/services/supabase_service.py`.
-
-### Schema, RLS, and Grants
-
-```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- User profiles
-CREATE TABLE user_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
-  email TEXT UNIQUE NOT NULL,
-  full_name TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- File uploads
-CREATE TABLE file_uploads (
-  upload_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  file_name TEXT NOT NULL,
-  file_size BIGINT NOT NULL,
-  file_path TEXT NOT NULL,
-  status TEXT DEFAULT 'uploaded',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  CONSTRAINT valid_status CHECK (status IN ('uploaded', 'processing', 'completed', 'failed'))
-);
-
--- Model executions
-CREATE TABLE model_executions (
-  execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  upload_id UUID NOT NULL REFERENCES file_uploads ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  status TEXT DEFAULT 'queued',
-  results JSONB,
-  error_message TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  completed_at TIMESTAMP WITH TIME ZONE,
-  processing_time_ms INTEGER,
-  CONSTRAINT valid_execution_status CHECK (status IN ('queued', 'processing', 'completed', 'failed'))
-);
-
--- ROI analyses metadata (for supabase_service.py)
-CREATE TABLE roi_analyses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  execution_id UUID NOT NULL REFERENCES model_executions ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  metadata JSONB NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- Prediction summaries
-CREATE TABLE prediction_summaries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  execution_id UUID NOT NULL REFERENCES model_executions ON DELETE CASCADE,
-  upload_id UUID NOT NULL REFERENCES file_uploads ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  score_id TEXT NOT NULL,
-  predicted_value DOUBLE PRECISION NOT NULL,
-  top_regions JSONB DEFAULT '[]'::jsonb,
-  completed_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- Indexes
-CREATE INDEX idx_file_uploads_user_id ON file_uploads(user_id);
-CREATE INDEX idx_file_uploads_status ON file_uploads(status);
-CREATE INDEX idx_file_uploads_created_at ON file_uploads(created_at DESC);
-
-CREATE INDEX idx_model_executions_user_id ON model_executions(user_id);
-CREATE INDEX idx_model_executions_upload_id ON model_executions(upload_id);
-CREATE INDEX idx_model_executions_status ON model_executions(status);
-CREATE INDEX idx_model_executions_created_at ON model_executions(created_at DESC);
-
-CREATE INDEX idx_roi_analyses_user_id ON roi_analyses(user_id);
-CREATE INDEX idx_roi_analyses_execution_id ON roi_analyses(execution_id);
-
-CREATE INDEX idx_prediction_summaries_user_id ON prediction_summaries(user_id);
-CREATE INDEX idx_prediction_summaries_score_id ON prediction_summaries(score_id);
-CREATE INDEX idx_prediction_summaries_completed_at ON prediction_summaries(completed_at DESC);
-CREATE INDEX idx_prediction_summaries_execution_id ON prediction_summaries(execution_id);
-
--- Enable RLS
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE file_uploads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE model_executions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE roi_analyses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE prediction_summaries ENABLE ROW LEVEL SECURITY;
-
--- User profiles policies
-CREATE POLICY "Users can view own profile" ON user_profiles
-FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile" ON user_profiles
-FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can create profile" ON user_profiles
-FOR INSERT WITH CHECK (auth.uid() = id);
-
--- File uploads policies
-CREATE POLICY "Users can view own uploads" ON file_uploads
-FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create uploads" ON file_uploads
-FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own uploads" ON file_uploads
-FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own uploads" ON file_uploads
-FOR DELETE USING (auth.uid() = user_id);
-
--- Model executions policies
-CREATE POLICY "Users can view own executions" ON model_executions
-FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create executions" ON model_executions
-FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own executions" ON model_executions
-FOR UPDATE USING (auth.uid() = user_id);
-
--- ROI analyses policies
-CREATE POLICY "Users can view own roi analyses" ON roi_analyses
-FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create roi analyses" ON roi_analyses
-FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Prediction summaries policies
-CREATE POLICY "Users can view own prediction summaries" ON prediction_summaries
-FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create prediction summaries" ON prediction_summaries
-FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own prediction summaries" ON prediction_summaries
-FOR DELETE USING (auth.uid() = user_id);
-
-grant usage on schema public to service_role;
-
-grant select, insert, update, delete
-on table public.user_profiles
-to service_role;
-
-grant select, insert, update, delete
-on table public.file_uploads
-to service_role;
-
-grant select, insert, update, delete
-on table public.model_executions
-to service_role;
-
-grant select, insert, update, delete
-on table public.roi_analyses
-to service_role;
-
-grant select, insert, update, delete
-on table public.prediction_summaries
-to service_role;
-
-grant usage, select, update
-on all sequences in schema public
-to service_role;
-```
-
-### Optional: Create user_profiles after email confirmation
-
-```sql
-create or replace function public.handle_user_email_confirmed()
-returns trigger as $$
-begin
-  if new.email_confirmed_at is not null
-     and (old.email_confirmed_at is null or old.email_confirmed_at <> new.email_confirmed_at) then
-    insert into public.user_profiles (id, email, created_at, updated_at)
-    values (new.id, new.email, now(), now())
-    on conflict (id) do nothing;
-  end if;
-
-  return new;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists on_auth_user_confirmed on auth.users;
-
-create trigger on_auth_user_confirmed
-after update on auth.users
-for each row execute function public.handle_user_email_confirmed();
-```
 
 ## Upload and Analysis Flow
 
@@ -344,6 +169,14 @@ Use the authenticated endpoint below to inspect model availability:
 GET /api/models
 ```
 
+## Training
+
+The `training/` folder holds the model-training code used to produce the `.pt`
+weights in `backend/models/`. It is **not** part of the deployed runtime — the
+backend loads the pre-trained weights directly. This folder is kept on GitHub for
+reproducibility but is excluded from the Hugging Face Space (see the auto-sync note
+above) and from the backend Docker image.
+
 ## Tooling and Framework Notes
 
 - TypeScript: `^6.0.3`
@@ -378,7 +211,7 @@ git lfs install
 git lfs pull
 ```
 
-Large files include model weights, generated brain visualizations, atlas files, and backend data JSON files. Keep large binary assets out of normal Git history.
+Large files include model weights, generated brain visualizations, and backend brain-importance JSON files. Keep large binary assets out of normal Git history.
 
 ## Hugging Face Spaces Docker Image
 
@@ -390,7 +223,7 @@ The root `Dockerfile` builds only the backend runtime:
 - Exposes port `8000`
 - Starts `uvicorn main:app --host 0.0.0.0 --port 8000`
 
-`.dockerignore` excludes `frontend/`, local virtualenvs, caches, notebooks outputs, and other files not needed by the backend image.
+`.dockerignore` excludes `frontend/`, `training/`, `database/`, local virtualenvs, caches, and other files not needed by the backend image.
 
 ## Troubleshooting
 

@@ -60,3 +60,7 @@ temp/
 .git/
 .gitignore
 .github/
+
+# === Folders not needed in the backend image ===
+training/
+database/

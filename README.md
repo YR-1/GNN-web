@@ -24,8 +24,7 @@ MindPulse is a full-stack neuroimaging web app for uploading ROI time-series fil
 .
 |-- backend/                 FastAPI app, model services, Supabase services
 |-- frontend/                Next.js app
-|-- notebooks/               Data conversion and analysis notebooks/scripts
-|-- docs/                    Project notes and changelog
+|-- notebooks/               Graph preprocessing imported by backend
 |-- .github/workflows/       GitHub Actions automation
 |-- Dockerfile               Hugging Face Spaces backend image
 `-- .dockerignore            Backend image exclusions
@@ -388,11 +387,10 @@ The root `Dockerfile` builds only the backend runtime:
 - Installs Python dependencies from `backend/requirements.txt`
 - Copies `backend/` into `/app`
 - Copies notebooks needed by backend analysis
-- Copies Shen atlas files into `/app`
 - Exposes port `8000`
 - Starts `uvicorn main:app --host 0.0.0.0 --port 8000`
 
-`.dockerignore` excludes `frontend/`, `docs/`, local virtualenvs, caches, notebooks outputs, and other files not needed by the backend image.
+`.dockerignore` excludes `frontend/`, local virtualenvs, caches, notebooks outputs, and other files not needed by the backend image.
 
 ## Troubleshooting
 

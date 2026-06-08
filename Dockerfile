@@ -17,13 +17,6 @@ COPY backend/ .
 # Copy notebooks for Papermill execution
 COPY notebooks/ /app/notebooks/
 
-# copy root-level Shen atlas files
-COPY shen_2mm_268.nii.gz /app/
-COPY shen_268_networklabels.csv /app/
-COPY shen_raw.json /app/
-COPY shen268_centroids_mni.csv /app/
-COPY shen268_mni_centroids_user_order.csv /app/
-
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

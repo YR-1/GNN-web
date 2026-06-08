@@ -60,12 +60,3 @@ temp/
 .git/
 .gitignore
 .github/
-
-# === AI assistant memory ===
-.claude/
-
-# === Folders not needed in backend container ===
-docs/
-data/
-
-REFACTORING_SUMMARY.md

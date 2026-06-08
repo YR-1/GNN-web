@@ -7,7 +7,6 @@ frontend/.next-build-verify/
 frontend/out/
 frontend/build/
 frontend/next-env.d.ts
-frontend/package-lock.json
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
